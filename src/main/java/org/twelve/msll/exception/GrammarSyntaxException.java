@@ -1,7 +1,3 @@
-/*
- * Copyright (c) Huawei Technologies Co., Ltd. 2023-2023. All rights reserved.
- */
-
 package org.twelve.msll.exception;
 
 import org.twelve.msll.parser.MsllStack;
