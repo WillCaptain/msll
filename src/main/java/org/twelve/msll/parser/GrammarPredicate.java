@@ -1,9 +1,9 @@
 package org.twelve.msll.parser;
 
-import javafx.util.Pair;
 import org.twelve.msll.lexer.Token;
 import org.twelve.msll.lexer.TokenBuffer;
 import org.twelve.msll.util.Constants;
+import org.twelve.msll.util.Pair;
 import org.twelve.msll.util.Tool;
 
 import java.util.ArrayList;

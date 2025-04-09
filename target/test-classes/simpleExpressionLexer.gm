@@ -1,0 +1,16 @@
+/*
+* this is a simple lexer for numeric expression
+* huizi 2024
+*/
+lexer grammar SimpleExpressionLexer;
+
+channels{
+    HIDDEN,
+    ERROR
+
+}
+
+LET : 'let';
+ID : /"(\b[a-z_]\w*)"/;
+LONG_COMMENT: /"\/\*[\s\S]*?\*\/"/ ->channel(HIDDEN), some_method;
+
