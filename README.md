@@ -1,6 +1,67 @@
-# msll
-Traditional LL(1) parsers efficiently handle simple grammatical structures by utilizing a single lookahead symbol. However, their effectiveness diminishes when confronted with complex or highly ambiguous grammars. While LL(k) parsers extend LL(1) capabilities by employing a fixed number of lookahead symbols, they still encounter limitations in parsing intricate and recursive syntactic constructs, often leading to increased complexity as the lookahead depth (k) grows.
+### Overview
+The Multi-Stack LL(*) (MSLL) parser is a lightweight runtime parsing engine designed for rapid grammar prototyping, interactive debugging, and domain-specific language (DSL) development. Unlike traditional LL(*) parsers (e.g., ANTLR), MSLL dynamically resolves ambiguities through stack duplication and pruning, eliminating the need for static DFA generation or recompilation.
 
-To address these challenges, we introduce a novel Multi-Stack LL(*) Parsing method (MSLL) that offers a simpler and more intuitive solution by dynamically managing multiple parsing stacks without relying on complex Deterministic Finite Automata (DFA) constructions and code generation. MSLL preserves all the beneficial outcomes of LL(1) parsers, such as simplicity and ease of implementation, while extending their capabilities to handle more intricate and ambiguous grammars. Instead of constructing DFAs, MSLL duplicates parsing stacks whenever multiple productions match a given token, allowing the parser to explore multiple parsing paths concurrently. This multi-stack approach effectively manages ambiguities and recursive structures by maintaining independent parsing states across stacks.
+This repository contains:
+- The MSLL parsing engine (Java-based).
+- Example grammars and test cases.
+- Tools for FIRST/FOLLOW set computation.
+- A reference implementation for a custom language.
 
-We detail the MSLL methodology, including stack duplication and advancement, stack elimination and validity detection, and parse tree tagging and cleanup. Through comprehensive experiments, we demonstrate that MSLL successfully parses complex grammars, such as nested JSON objects and code blocks, while maintaining simplicity in grammar design. Although MSLL incurs a little additional memory and computational overhead due to stack duplication, it offers significant flexibility in grammar design and simplifies the parsing process by eliminating the need for intricate DFA constructions and code generation. Furthermore, we analyze the time and space complexities of MSLL, highlighting its suitability for applications where grammar flexibility and implementation simplicity outweigh performance constraints. The paper concludes with a discussion of potential optimizations to mitigate performance drawbacks and suggestions for future research to enhance the efficiency and scalability of the multi-stack approach.
+Meanwhile, the Multi-Stack LL(*) (MSLL) parser is not a competitor to ANTLR, but rather a complementary runtime enhancement for ANTLR's development workflow. MSLL enables:
+- Instant grammar prototyping without ANTLR's code generation step
+- Real-time ambiguity debugging during grammar design
+- Seamless migration to ANTLR for production use
+
+````mermaid
+graph LR
+    A[Grammar Design] --> B[MSLL Runtime Parser]
+    B --> C{Grammar Stable?}
+    C -->|No| B
+    C -->|Yes| D[Generate ANTLR Parser]
+````
+### Key Features
+1. Dynamic Stack Management
+- Stack Duplication: When ambiguity is detected, MSLL clones the current stack for each possible production.
+- Pruning: Invalid stacks are discarded during parsing, ensuring only valid paths proceed.
+
+2. Parse Tree Tagging
+- Each parse tree node is tagged with its originating stack, enabling clear debugging of ambiguous paths.
+
+3. Grammar Compatibility
+- Supports standard .g4-style grammar definitions (similar to ANTLR).
+- No need for left-factoring or left-recursion elimination.
+
+### Comparison with ANTLR/LL(*) Parsers
+|Feature |	MSLL |	ANTLR (LL(*)) |
+|--------|-------|----------------|
+|Runtime Parsing |	Yes (no codegen)	| No (requires DFA generation)|
+|Grammar Changes |	Instant feedback	| Recompilation needed |
+|Ambiguity Handling |	Multi-stack exploration |	Precomputed DFA paths|
+|Performance |	Slower in high ambiguity |	Optimized for production |
+
+### When to Use MSLL vs. ANTLR
+|Scenario |	MSLL |	ANTLR|
+|---------|------|-------|
+|Grammar prototyping |	✅ Ideal |	❌ Recompiles|
+|Production deployment |	⚠️ Temporary |	✅ Optimized|
+|Ambiguity exploration	| ✅ Visual	| ❌ Opaque|
+
+### Repository Structure
+````
+msll/  
+├── src/  
+│   ├── parser/  
+│   │   ├── MsllParser.java       # Core MSLL parsing engine  
+│   │   ├── MyParser.java         # Example parser for a custom language  
+│   │   └── ...  
+│   ├── grammar/  
+│   │   ├── GrammarBuilder.java   # FIRST/FOLLOW set computation  
+│   │   └── ...  
+│   └── ...  
+├── tests/  
+│   ├── json_block_test.txt       # Test case: JSON vs. Block ambiguity  
+│   ├── nested_lambda_test.txt    # Test case: Deeply nested structures  
+│   └── ...  
+├── README.md                     # This file  
+└── ...  
+````
