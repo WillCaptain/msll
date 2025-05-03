@@ -57,11 +57,36 @@ msll/
 │   ├── grammar/  
 │   │   ├── GrammarBuilder.java   # FIRST/FOLLOW set computation  
 │   │   └── ...  
-│   └── ...  
+│   └── lexer/
+|   └──...  
 ├── tests/  
-│   ├── json_block_test.txt       # Test case: JSON vs. Block ambiguity  
-│   ├── nested_lambda_test.txt    # Test case: Deeply nested structures  
+│   ├── CfgGrammarTest.java       # parse g4 grammar 
+│   ├── MyGrammarTest.java    # parse your grammar  
 │   └── ...  
 ├── README.md                     # This file  
 └── ...  
 ````
+### Getting Started
+#### Prerequisites
+- Java 8+ (OpenJDK or Oracle JDK)
+- Maven (for dependency management, if applicable)
+
+#### Building & Running
+- Clone the repository:
+````bash
+git clone https://github.com/WillCaptain/msll.git
+cd msll
+```` 
+- Example Usage:
+````java
+MyParserBuilder builder = new MyParserBuilder("testParser.gm", "testLexer.gm");  
+MyParser parser = builder.createParser("let var_a = 3 + 6;\n");  
+ParserTree tree = parser.parse();  
+````
+### Future Work
+- Optimizations: Bounded stack pruning, parallel stack evaluation.
+- IDE Integration: Live grammar debugging in VS Code/IntelliJ.
+- Formal Verification: Proofs for termination and correctness.
+
+### License
+MIT License - Free for academic and commercial use. See [LICENSE](https://opensource.org/license/mit) for details.
