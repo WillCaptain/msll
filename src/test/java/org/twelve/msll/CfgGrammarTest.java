@@ -15,22 +15,35 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.twelve.msll.util.Tool.cast;
 
+/**
+ * Unit tests for context-free grammar transformations and predicate parsing.
+ * huizi 
+ */
 public class CfgGrammarTest {
     private final String BETA = "a_beta'";
     private final String ALPHA_1 = "a_alpha_1'";
     private final String ALPHA_2 = "a_alpha_2'";
 
+    /**
+     * Tests whether long comments in the grammar are parsed correctly and recognized as special tokens.
+     */
     @Test
     @SneakyThrows
     void test_long_comments() {
         MyParserBuilder builder = new MyParserBuilder(new StringReader("e:ID PLUS e;\n /*comments\n comments\n*/\n f:ID PLUS f;"), new StringReader("ID:\"abc\";"));
-//        MyParserBuilder builder = new MyParserBuilder(new StringReader("b:ID;"));
         assertEquals(2, builder.grammars().grammars().size());
         NonTerminalNode grammars = cast(builder.parserGrammarTree().start().node(0));
         assertEquals("LONG_COMMENT", grammars.node(1).name());
 
     }
 
+    /**
+     * Tests left-recursion elimination in grammar rules.
+     * Original: A → Aα1 | Aα2 | β1 | β2
+     * Transformed:
+     *   A → β A'
+     *   A' → α1 A' | α2 A' | ε
+     */
     @Test
     @SneakyThrows
     void test_transform_left_recursion() {
@@ -73,6 +86,9 @@ public class CfgGrammarTest {
         assertEquals("DELTA", a1.productions().get(0).symbols().get(0).name());
     }
 
+    /**
+     * Tests parsing of associativity annotations.
+     */
     @Test
     @SneakyThrows
     void test_assoc_addition() {
@@ -81,6 +97,9 @@ public class CfgGrammarTest {
         assertEquals("RIGHT", builder.grammars().grammars().get(0).productions().get(0).assoc().name());
     }
 
+    /**
+     * Tests parsing of inline code-based predicates inside a production rule.
+     */
     @Test
     @SneakyThrows
     void test_code_addition() {
@@ -90,6 +109,9 @@ public class CfgGrammarTest {
         assertEquals("{notLineTerminator()}", builder.grammars().grammars().get(0).productions().get(0).symbols().get(0).name());//TODO
     }
 
+    /**
+     * Tests parsing of a GrammarPredicate from a raw function-like string.
+     */
     @Test
     void test_predicate_grammar_parse() {
         GrammarPredicate predicate = new GrammarPredicate("this.abc(1,\"abc\")");
