@@ -23,6 +23,8 @@ graph LR
 1. Dynamic Stack Management
 - Stack Duplication: When ambiguity is detected, MSLL clones the current stack for each possible production.
 - Pruning: Invalid stacks are discarded during parsing, ensuring only valid paths proceed.
+![image](https://github.com/user-attachments/assets/3273464d-910f-4620-8245-fb77e03bc701)
+
 
 2. Parse Tree Tagging
 - Each parse tree node is tagged with its originating stack, enabling clear debugging of ambiguous paths.
