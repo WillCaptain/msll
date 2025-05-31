@@ -1,0 +1,102 @@
+/*
+* this is outline parser for a new dynamic language inferred by GCP method
+* huizi 2024
+*/
+parser grammar OutlineParser;
+
+options {
+    tokenVocab = OutlineLexer;
+}
+//in msll, a root non terminal is required
+root: statement+;
+
+//---------statements----------------
+statement
+    : comment
+    | variableDeclarator
+    | assignment
+//    | importStatement
+//    | exportStatement
+//    | emptyStatement_
+//    | classDeclaration
+//    | functionDeclaration
+//    | expressionStatement
+//    | ifStatement
+//    | iterationStatement
+//    | continueStatement
+//    | breakStatement
+//    | returnStatement
+//    | yieldStatement
+//    | withStatement
+//    | labelledStatement
+//    | switchStatement
+//    | throwStatement
+//    | tryStatement
+//    | debuggerStatement
+    ;
+comment
+    : SingleLineComment
+    | MultiLineComment
+    ;
+variableDeclarator
+    //:(('let'|'var') {notLineTerminator()} ID '=' expression ';')
+    : ('let'|'var') {notLineTerminator()} assignment
+    ;
+
+//------------expressions-------------
+expression
+    : numeric_expression
+    | entity
+    | block
+    | array
+    | map
+    | lambda
+    | expression '[' NUMBER ']'     // array accessor
+    | expression '.' ID              //entity member accessor
+    | expression '(' (expression (','+ expression)*)? ')'       // function call
+    ;
+literal
+    : NUMBER
+    | STRING
+    | This
+    ;
+assignment
+    : ID '=' expression ';'
+    ;
+block
+    : '{' (expression | (statement+ expression?)) '}'
+    ;
+numeric_expression
+    :term_expression (('+'|'-') term_expression)*
+    ;
+term_expression
+    :unary_expression (('*'|'/'|'%'|'^') unary_expression)*
+    ;
+unary_expression
+    : ('++' | '--' | '-') factor_expression
+    |factor_expression ('++'|'--')?
+    ;
+factor_expression
+    : literal
+    | ID
+    | '(' expression ')'
+    ;
+array
+    : '[' expression (',' expression)* ']'
+    ;
+map
+    :'[' expression ':' expression (',' expression ':' expression)* ']'
+    ;
+entity
+    :'{' property_assignment (',' property_assignment)* ','? '}'
+    ;
+property_assignment
+    : (('let'|'var') {notLineTerminator()})? ID ':' expression
+    ;
+lambda
+    : lambda_args '->' expression
+    ;
+lambda_args
+    : ID
+    | '(' (ID (','+ ID)*)? ')'
+    ;

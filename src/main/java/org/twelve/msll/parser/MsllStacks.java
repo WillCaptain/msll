@@ -1,6 +1,9 @@
 package org.twelve.msll.parser;
 
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * A specialized ArrayList implementation for managing a list of `MsllStack` objects.
@@ -15,4 +18,40 @@ import java.util.ArrayList;
  * @author huizi 2024
  */
 public class MsllStacks extends ArrayList<MsllStack> {
+    private AtomicInteger maxStackSize = new AtomicInteger(0);
+    private AtomicInteger totalStackSize = new AtomicInteger(0);
+
+    public Integer maxStackSize(){
+        return this.maxStackSize.get();
+    }
+    public Integer totalStackSize(){
+        return this.totalStackSize.get();
+    }
+    @Override
+    public boolean add(MsllStack parseNodes) {
+        boolean result =  super.add(parseNodes);
+        this.totalStackSize.incrementAndGet();
+        setMaxStackSize();
+        return result;
+    }
+
+    @Override
+    public boolean removeIf(Predicate<? super MsllStack> filter) {
+        boolean result =   super.removeIf(filter);
+        setMaxStackSize();
+        return result;
+    }
+
+    @Override
+    public MsllStack remove(int index) {
+        MsllStack result = super.remove(index);
+        setMaxStackSize();
+        return result;
+    }
+
+    private void setMaxStackSize(){
+        if(this.maxStackSize.get()<this.size()){
+            this.maxStackSize.set(this.size());
+        }
+    }
 }

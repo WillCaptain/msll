@@ -21,6 +21,7 @@ import static org.twelve.msll.util.Tool.cast;
  */
 public class CfgGrammarTest {
     private final String BETA = "a_beta'";
+    private final String ALPHA = "a_alpha'";
     private final String ALPHA_1 = "a_alpha_1'";
     private final String ALPHA_2 = "a_alpha_2'";
 
@@ -50,23 +51,28 @@ public class CfgGrammarTest {
         // A → Aα1 |Aα2 |...|Aαn | β1 | β2 |...|βn
         //--------eliminate left recursion----------------
         // β → β1 | β2 |...|βn
-        // A  → β Ai'
-        // Ai' → αi Ai' | ε
+        // A  → β A0'
+        // A0' → A1'|...|Ai' | ε
+        //Ai' → αi A0'
         MyParserBuilder builder = new MyParserBuilder(new StringReader("a:a ALPHA | a DELTA | BETA | GAMMA;"),
                 new StringReader("ALPHA:\"alpha\"; BETA:\"beta\"; GAMMA:\"gamma\"; DELTA:\"DELTA\";"));
         List<Grammar> grammars = builder.grammars().grammars();
-        assertEquals(4, grammars.size());
+        assertEquals(5, grammars.size());
         Grammar main = grammars.get(0);
-        assertEquals(2, main.productions().size());
+        assertEquals(1, main.productions().size());
         assertEquals("a", main.name());
         //A  → β A0'
-        Production alpha = main.productions().get(0);
-        assertEquals(BETA, alpha.symbols().get(0).name());
-        assertEquals(ALPHA_1, alpha.symbols().get(1).name());
-        //A  → β A1'
-        Production delta = main.productions().get(1);
-        assertEquals(BETA, delta.symbols().get(0).name());
-        assertEquals(ALPHA_2, delta.symbols().get(1).name());
+        Production top = main.productions().get(0);
+        assertEquals(BETA, top.symbols().get(0).name());
+        assertEquals(ALPHA, top.symbols().get(1).name());
+        //A1'  → α1 A0'
+        Production alpha = grammars.get(2).productions().get(0);
+        assertEquals("ALPHA", alpha.symbols().get(0).name());
+        assertEquals(ALPHA, alpha.symbols().get(1).name());
+        //A2'  → α2 A0'
+        Production delta = grammars.get(3).productions().get(0);
+        assertEquals("DELTA", delta.symbols().get(0).name());
+        assertEquals(ALPHA, delta.symbols().get(1).name());
 
         // β → β1 | β2 |...|βn
         Grammar beta = grammars.get(1);
@@ -77,13 +83,13 @@ public class CfgGrammarTest {
         //β2
         assertEquals("GAMMA", beta.productions().get(1).symbols().get(0).name());
 
-        // Ai' → αi Ai' | ε
-        Grammar a0 = grammars.get(2);
-        assertEquals(ALPHA_1, a0.name());
-        assertEquals("ALPHA", a0.productions().get(0).symbols().get(0).name());
-        Grammar a1 = grammars.get(3);
-        assertEquals(ALPHA_2, a1.name());
-        assertEquals("DELTA", a1.productions().get(0).symbols().get(0).name());
+        // A0' → A1‘ |...| Ai' | ε
+        Grammar a0 = grammars.get(4);
+        assertEquals(ALPHA, a0.name());
+        assertEquals("EPSILON", a0.productions().get(0).symbols().get(0).name());
+        assertEquals(ALPHA_1, a0.productions().get(1).symbols().get(0).name());
+        assertEquals(ALPHA_2, a0.productions().get(2).symbols().get(0).name());
+
     }
 
     /**

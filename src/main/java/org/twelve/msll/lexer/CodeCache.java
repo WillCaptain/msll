@@ -22,7 +22,7 @@ public class CodeCache {
             String appended = this.lines.remove(this.lines.size() - 1) +"\n"+ line;
             this.lines.add(appended);
         } else {
-            this.isMultiLine = line.startsWith("/*");
+            this.isMultiLine = line.startsWith("/*") && (!line.trim().endsWith("*/"));
             this.lines.add(line);
         }
         return this.lines.size() - 1;

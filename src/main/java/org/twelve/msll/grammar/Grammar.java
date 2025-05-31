@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
  * Represents a Context-Free Grammar (CFG) for parsing a language.
  * Each Grammar object corresponds to a non-terminal in the language and stores
  * its associated production rules, which define how the non-terminal can be derived.
- *
+ * <p>
  * Features include computing FIRST and FOLLOW sets, and eliminating left recursion.
  * This is useful for building parsers, especially LL-based parsers.
  *
@@ -147,7 +147,7 @@ public class Grammar {
 
     /**
      * Sets the reference to the entire grammar collection.
-     *
+     * <p>
      * Relationship: The Grammars class is a collection or container that includes multiple Grammar objects,
      * representing the entire grammar. Each Grammar object can reference and relate to other Grammar objects
      * through this grammars reference.
@@ -173,7 +173,7 @@ public class Grammar {
 
     /**
      * Sets the trace status of the non-terminal.
-     *
+     * <p>
      * Relationship: When debugging or printing information about the non-terminal, its trace status can be set to true.
      */
     public void trace() {
@@ -202,39 +202,113 @@ public class Grammar {
     public void eliminateLeftRecur(Map<String, Grammar> grammars) {
         if (!this.productions.stream().anyMatch(p -> p.isLeftRecur())) return;
         //β → β1 | β2 |...|βn
-        Grammar beta = abstractBeta(grammars,this.productions.stream().filter(p -> !p.isLeftRecur()).collect(Collectors.toList()));
+        Grammar beta = abstractBeta(grammars, this.productions.stream().filter(p -> !p.isLeftRecur()).collect(Collectors.toList()));
         //A → Aα1 |Aα2 |...|Aαn
         List<Production> lefts = this.productions.stream().filter(p -> p.isLeftRecur()).collect(Collectors.toList());
-        //A  → β Ai'
-        //Ai' → αi Ai' | ε
-        for(int i=0; i<lefts.size(); i++) {
-            Production left = lefts.get(i);
-            //Ai' → αi Ai' | ε
-            Grammar ai = abstractAi(grammars,left,i+1);
-            //A  → β Ai'
-            List<Symbol> bAi = new ArrayList<>();
-            bAi.add(new Symbol<>(beta.nonTerminal, beta.name()));
-            bAi.add(new Symbol<>(ai.nonTerminal,ai.name()));
-            new Production(this, bAi, nonTerminals, terminals);
+        if (lefts.size() == 1) {
+            this.eliminateLeftRecur(grammars, lefts.getFirst(), beta);
+        } else {
+            this.eliminateLeftRecur(grammars, lefts, beta);
         }
+    }
+
+    private void eliminateLeftRecur(Map<String, Grammar> grammars, List<Production> productions, Grammar beta) {
+        //A  → β A0'
+        Grammar a0 = abstractAlpha(grammars);
+        List<Symbol> bAi = new ArrayList<>();
+        bAi.add(new Symbol<>(beta.nonTerminal, beta.name()));
+        bAi.add(new Symbol<>(a0.nonTerminal, a0.name()));
+        new Production(this, bAi, nonTerminals, terminals);
+        //A0' -> A1'|...|Ai'|ε
+        //Ai' → αi Ai'
+        for (int i = 0; i < productions.size(); i++) {
+            Production production = productions.get(i);
+            //Ai' → αi Ai' | ε
+            Grammar ai = abstractAlpha(grammars, production, i + 1);
+            //A0' -> A1'|...|Ai'|ε
+            bAi = new ArrayList<>();
+//            bAi.add(new Symbol<>(beta.nonTerminal, beta.name()));
+            bAi.add(new Symbol<>(ai.nonTerminal, ai.name()));
+            new Production(a0, bAi, nonTerminals, terminals);
+        }
+    }
+
+    private void eliminateLeftRecur(Map<String, Grammar> grammars, Production production, Grammar beta) {
+        //Ai' → αi Ai' | ε
+        Grammar ai = abstractAlpha(grammars, production);
+        //A  → β Ai'
+        List<Symbol> bAi = new ArrayList<>();
+        bAi.add(new Symbol<>(beta.nonTerminal, beta.name()));
+        bAi.add(new Symbol<>(ai.nonTerminal, ai.name()));
+        new Production(this, bAi, nonTerminals, terminals);
+    }
+
+    private Grammar abstractAlpha(Map<String, Grammar> grammars) {
+        String aName = this.name + "_alpha'";
+        Grammar a0 = this.addGrammar(grammars, aName);
+        List<Symbol> epsilonSymbols = new ArrayList<>();
+        epsilonSymbols.add(new Symbol<>(this.terminals.EPSILON));
+        new Production(a0, epsilonSymbols, nonTerminals, terminals);
+        return a0;
+    }
+
+    /**
+     * Ai' → αi A0'
+     */
+    private Grammar abstractAlpha(Map<String, Grammar> grammars, Production left, Integer idx) {
+        String aiName = this.name + "_alpha_" + idx + "'";
+        String aiiName = this.name + "_alpha'";
+        Grammar ai = this.addGrammar(grammars,aiName);
+        List<Symbol> symbols = left.symbols();
+        symbols.remove(0);
+        symbols.add(new Symbol<>(nonTerminal, aiiName));
+        new Production(ai, symbols, nonTerminals, terminals);
+
+        left.grammar().productions().remove(left);
+        return ai;
+    }
+    private Grammar abstractAlpha1111(Map<String, Grammar> grammars, Production left, Integer idx) {
+        //Ai' → αi (Ai' | ε)
+        String aiName = this.name + "_alpha_" + idx + "'";
+        String aiiName = this.name + "_alpha_" + idx + "''";
+        //Ai' -> ai Ai''
+        Grammar ai = this.addGrammar(grammars,aiName);
+        List<Symbol> symbols = left.symbols();
+        symbols.remove(0);
+        symbols.add(new Symbol<>(nonTerminal, aiiName));
+        new Production(ai, symbols, nonTerminals, terminals);
+
+        //Ai'' -> Ai' | ε
+        Grammar aii = this.addGrammar(grammars, aiiName);
+        symbols = new ArrayList<>();
+        symbols.add(new Symbol<>(nonTerminal, aiName));
+        new Production(aii, symbols, nonTerminals, terminals);
+        List<Symbol> epsilonSymbols = new ArrayList<>();
+        epsilonSymbols.add(new Symbol<>(this.terminals.EPSILON));
+        new Production(aii, epsilonSymbols, nonTerminals, terminals);
+
+
+
+        left.grammar().productions().remove(left);
+        return aii;
     }
 
     /**
      * Ai' → αi Ai' | ε
      */
-    private Grammar abstractAi(Map<String, Grammar> grammars, Production left, int idx) {
-        String aName = this.name+"_alpha_"+idx+"'";
-        Grammar a = this.addGrammar(grammars, aName);
+    private Grammar abstractAlpha(Map<String, Grammar> grammars, Production left) {
+        String aName = this.name + "_alpha'";
+        Grammar ai = this.addGrammar(grammars, aName);
         //αi Ai'
         List<Symbol> symbols = left.symbols();
         symbols.remove(0);
-        symbols.add(new Symbol(nonTerminal,aName));
-        new Production(a,symbols,nonTerminals,terminals);
+        symbols.add(new Symbol<>(nonTerminal, aName));
+        new Production(ai, symbols, nonTerminals, terminals);
         List<Symbol> epsilonSymbols = new ArrayList<>();
         epsilonSymbols.add(new Symbol<>(this.terminals.EPSILON));
-        new Production(a,epsilonSymbols,nonTerminals,terminals);
+        new Production(ai, epsilonSymbols, nonTerminals, terminals);
         left.grammar().productions().remove(left);
-        return a;
+        return ai;
     }
 
     /**
@@ -242,19 +316,19 @@ public class Grammar {
      */
     private Grammar abstractBeta(Map<String, Grammar> grammars, List<Production> productions) {
         String betaName = this.name + "_beta'";
-        Grammar beta = this.addGrammar(grammars,betaName);
+        Grammar beta = this.addGrammar(grammars, betaName);
         for (Production production : productions) {
-            new Production(beta,production.symbols(),nonTerminals,terminals);
+            new Production(beta, production.symbols(), nonTerminals, terminals);
             this.productions.remove(production);
 //            production.changeGrammar(beta);
         }
         return beta;
     }
 
-    private Grammar addGrammar(Map<String, Grammar> grammars, String name){
+    private Grammar addGrammar(Map<String, Grammar> grammars, String name) {
         NonTerminal nonTerminal = this.nonTerminals.addNonTerminal(name);
         Grammar beta = new Grammar(nonTerminal, this.nonTerminals, this.terminals, name);
-        grammars.put(name,beta);
+        grammars.put(name, beta);
         return beta;
     }
 }

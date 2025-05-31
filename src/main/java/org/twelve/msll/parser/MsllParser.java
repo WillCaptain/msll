@@ -84,7 +84,7 @@ public abstract class MsllParser<P extends ParserTree> {
      * As the parser progresses, stacks are dynamically added, duplicated, or eliminated based on token matches.
      * The parsing continues until only one stack remains, representing the successful parse, or until all stacks are eliminated.
      */
-    private final List<MsllStack> stacks = new MsllStacks();
+    private final MsllStacks stacks;
 
     /**
      * Represents the raw parsing result before the Abstract Syntax Tree (AST) is constructed.
@@ -133,7 +133,16 @@ public abstract class MsllParser<P extends ParserTree> {
         stack.push(start);
         this.parseTree = createParseTree(start);
         this.predictTable = predictTable;
+        stacks = new MsllStacks();
+
         stacks.add(stack);
+    }
+
+    public Integer maxStackSize(){
+        return this.stacks.maxStackSize();
+    }
+    public Integer totalStackSize(){
+        return this.stacks.totalStackSize();
     }
 
     /**

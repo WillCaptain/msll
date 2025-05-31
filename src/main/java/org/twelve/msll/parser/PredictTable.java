@@ -97,7 +97,7 @@ public class PredictTable {
                 }
             }
             Tool.grammarError("token: " + terminal.name() + ":" + token.lexeme()
-                    + " doesn't match any ohScript grammar definition at line: " + token.location().line().number()
+                    + " doesn't match any grammar definition at line: " + token.location().line().number()
                     + ", position from " + (token.location().start() - token.location().line().beginIndex()) + " to "
                     + (token.location().end() - token.location().line().beginIndex()) + lineSeparator + line
                     + lineSeparator + " the possible productions should be matched would be:" + sb);
