@@ -13,11 +13,12 @@ root: statement+;
 //---------statements----------------
 statement
     : comment
-    | variableDeclarator
+    | variable_declarator
     | assignment
+    | empty_statement
+    | return_statement
 //    | importStatement
 //    | exportStatement
-//    | emptyStatement_
 //    | classDeclaration
 //    | functionDeclaration
 //    | expressionStatement
@@ -34,37 +35,23 @@ statement
 //    | tryStatement
 //    | debuggerStatement
     ;
+//--------statements--------------
 comment
     : SingleLineComment
     | MultiLineComment
     ;
-variableDeclarator
-    //:(('let'|'var') {notLineTerminator()} ID '=' expression ';')
+variable_declarator
     : ('let'|'var') {notLineTerminator()} assignment
     ;
-
+empty_statement
+    : expression ';'?
+    ;
+return_statement
+    : 'return' expression ';'
+    ;
 //------------expressions-------------
 expression
     : numeric_expression
-    | entity
-    | block
-    | array
-    | map
-    | lambda
-    | expression '[' NUMBER ']'     // array accessor
-    | expression '.' ID              //entity member accessor
-    | expression '(' (expression (','+ expression)*)? ')'       // function call
-    ;
-literal
-    : NUMBER
-    | STRING
-    | This
-    ;
-assignment
-    : ID '=' expression ';'
-    ;
-block
-    : '{' (expression | (statement+ expression?)) '}'
     ;
 numeric_expression
     :term_expression (('+'|'-') term_expression)*
@@ -79,16 +66,40 @@ unary_expression
 factor_expression
     : literal
     | ID
+    | entity
+    | tuple
+    | block
+    | array
+    | map
+    | lambda
+    | function
+    | factor_expression '[' NUMBER ']'     // array_accessor
+    | factor_expression '.' ID              // entity_member_accessor
+    | factor_expression '(' (expression (','+ expression)*)? ')'       // function_call
     | '(' expression ')'
+    ;
+literal
+    : NUMBER
+    | STRING
+    | This
+    ;
+assignment
+    : ID ('='|'+='|'-='|'*='|'/=') expression ';'
+    ;
+block
+    : '{' statement+ '}'
     ;
 array
     : '[' expression (',' expression)* ']'
     ;
 map
-    :'[' expression ':' expression (',' expression ':' expression)* ']'
+    : '[' expression ':' expression (',' expression ':' expression)* ']'
     ;
 entity
-    :'{' property_assignment (',' property_assignment)* ','? '}'
+    : '{' property_assignment (',' property_assignment)* ','? '}'
+    ;
+tuple
+    : '(' expression (','expression)* ')'
     ;
 property_assignment
     : (('let'|'var') {notLineTerminator()})? ID ':' expression
@@ -98,5 +109,11 @@ lambda
     ;
 lambda_args
     : ID
-    | '(' (ID (','+ ID)*)? ')'
+    | function_args'
+    ;
+function_args'
+    : '(' (ID (','+ ID)*)? ')'
+    ;
+function
+    : 'fx' function_args' block
     ;

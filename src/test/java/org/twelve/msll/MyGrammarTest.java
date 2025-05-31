@@ -98,15 +98,25 @@ public class MyGrammarTest {
         assertEquals("a", ((NonTerminalNode) ((NonTerminalNode) tree.start().node(1)).node(1)).node(0).toString());
         assertEquals("MultiLineComment", tree.start().node(0).symbol().name());
     }
-    
+
+    @Test
+    void test_with_line_terminator() {
+        try {
+            builder.createParser("let" + System.lineSeparator() + " a=5;").parse();
+            fail();
+        } catch (Exception e) {
+
+        }
+    }
+
     /**
-     * Ensures that parsing fails when encountering a line terminator in a restricted context.
+     * msll paper: section 7 case 1
      */
     @Test
     void test_multi_layers() {
         /**
-         * test execution time for 100 times is different from machines
-         * in mac air m1 2020, the average execution time is around 40ms
+         * test execution time for 1000 times is different from machines
+         * in mac air m1 2020, the average execution time is around 70-85ms
          */
         String code = """
                     let me = {
@@ -120,18 +130,27 @@ public class MyGrammarTest {
                         }],
                         make_friend: friend -> this.friends.put(friend.name[0], friend)
                     }}}}}
-                };""";
+                };
+                me.make_friend({
+                    name: ("Noble", "Zhang"),
+                    age: 10
+                });
+                
+                {{{{
+                    let more = 100;
+                    me.friends.get("Noble").age + me.age + more
+                }}}}""";
         MsllParser<?> parser = builder.createParser(code);
-        for (int i = 0; i < 99; i++) {
+        for (int i = 0; i < 999; i++) {
             parser.parse();
         }
         ParserTree tree = parser.parse();
         assertEquals(5, parser.maxStackSize());//maximum online stacks
-        assertEquals(45, parser.totalStackSize());//due to the code change, 45 is different from the number（39） in paper
+        assertEquals(74, parser.totalStackSize());//due to the grammar change, 74 is different from the number（39） in paper
         //verify the parsing result is correct
         //let me = ... is a variant declarator
         NonTerminalNode varDeclarator = cast(tree.start().node(0));
-        assertEquals("variableDeclarator", varDeclarator.name());
+        assertEquals("variable_declarator", varDeclarator.name());
         //let .. ={..} is a block
         NonTerminalNode block = cast(((NonTerminalNode) varDeclarator.node(1)).node(2));
         assertEquals("block", block.name());
@@ -161,20 +180,72 @@ public class MyGrammarTest {
         property = cast(entity.node(7));
         NonTerminalNode lambda = cast(property.node(2));
         assertEquals("lambda", lambda.name());
+
+        //me.make_friend(....)
+        NonTerminalNode emptyStatement = cast(tree.start().node(1));
+        assertEquals("empty_statement",emptyStatement.name());
+
+        //{{{{...}}}} return block
+        NonTerminalNode returnBlock = cast(tree.start().node(2));
+        assertEquals("block",returnBlock.name());
     }
 
+    /**
+     * msll paper: section 7 case 2
+     */
     @Test
     void test_deep_layers() {
-
-    }
-
-    @Test
-    void test_with_line_terminator() {
-        try {
-            builder.createParser("let" + System.lineSeparator() + " a=5;").parse();
-            fail();
-        } catch (Exception e) {
-
+        /**
+         * test execution time for 1000 times is different from machines
+         * in mac air m1 2020, the average execution time is around 80-84ms
+         */
+        String code = """
+                me.make_friend({
+                    name:("Noble","Zhang"),
+                    age:1,
+                    friends:[{
+                        name:{
+                            last:"a",
+                            first:"b",
+                            friends:[{
+                                name:"c",
+                                friends:[{
+                                    name:"d",
+                                    friends:["name":"e"]
+                }]}]}}]});
+                var result = fx(x,y,z){ { { {
+                	let more = 1+counter;
+                	me.friends.get("Noble").age+me.age+more+x(y,z)
+                } } }};
+                counter += result((a,b)->a+b,1,2);""";
+        MsllParser<?> parser = builder.createParser(code);
+        for (int i = 0; i < 999; i++) {
+            parser.parse();
         }
+        ParserTree tree = parser.parse();
+        assertEquals(33, parser.maxStackSize());//maximum online stacks
+        assertEquals(181, parser.totalStackSize());//due to the grammar change, 181 is different from the number（2989） in paper
+        //verify the parse tree
+        NonTerminalNode makeFriends = cast(((NonTerminalNode) tree.start().node(0)).node(0));
+        assertEquals("factor_expression",makeFriends.name());
+        NonTerminalNode result = cast(tree.start().node(1));
+        assertEquals("variable_declarator",result.name());
+        NonTerminalNode counter = cast(tree.start().node(2));
+        assertEquals("assignment",counter.name());
     }
+
+    /**
+     * msll paper: section 7 case 3
+     */
+    @Test
+    void test_flat() {
+        MsllParser<?> parser = builder.createParser("let a=100;");
+        for (int i = 0; i < 1999; i++) {
+            parser.parse();
+        }
+        ParserTree tree = parser.parse();
+        assertEquals(1, parser.maxStackSize());//same as ll(1)
+        assertEquals(1, parser.totalStackSize());//same as ll(1)
+    }
+
 }
