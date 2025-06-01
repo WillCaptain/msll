@@ -73,9 +73,9 @@ factor_expression
     | map
     | lambda
     | function
-    | factor_expression '[' NUMBER ']'     // array_accessor
-    | factor_expression '.' ID              // entity_member_accessor
-    | factor_expression '(' (expression (','+ expression)*)? ')'       // function_call
+    | factor_expression '[' NUMBER ']'                               # array_accessor aaa
+    | factor_expression '.' ID                                       # entity_member_accessor
+    | factor_expression '(' (expression (','+ expression)*)? ')'     # function_call
     | '(' expression ')'
     ;
 literal

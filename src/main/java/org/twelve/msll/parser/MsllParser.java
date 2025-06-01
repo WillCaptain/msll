@@ -271,6 +271,7 @@ public abstract class MsllParser<P extends ParserTree> {
         }
         for (int j = 0; j < productions.size(); j++) {
             Production production = productions.get(j);
+            node.setExplain(production.explain());
             MsllStack matched = all.get(j);
             List<Symbol> symbols = production.symbols();
             // 反向遍历该non terminal node type命中production的所有symbol

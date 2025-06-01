@@ -1,5 +1,6 @@
 package org.twelve.msll.parsetree;
 
+import lombok.Setter;
 import org.twelve.msll.grammarsymbol.NonTerminal;
 import org.twelve.msll.lexer.Location;
 import org.twelve.msll.parser.Symbol;
@@ -11,19 +12,21 @@ import java.util.List;
  * A `NonTerminalNode` represents a non-terminal symbol in the parse tree.
  * It is a specific type of `ParseNode` that is used to store non-terminal nodes,
  * such as grammar rules that are further expandable into other rules or terminals.
- *
+ * <p>
  * In contrast to `TerminalNode`, which contains only one terminal token, a `NonTerminalNode`
  * typically contains a list of other `ParseNode`s (both terminals and non-terminals),
  * which correspond to the production rule being expanded.
- *
+ * <p>
  * The `NonTerminalNode` is central to forming the structure of the parse tree,
  * as it can recursively hold other nodes and represent complex grammar rules.
  *
  * @author huizi 2024
  */
-public class NonTerminalNode extends ParseNode<NonTerminal>{
+public class NonTerminalNode extends ParseNode<NonTerminal> {
     // List of child nodes (both Terminal and NonTerminal nodes)
     private final List<ParseNode> nodes = new ArrayList<>();
+    @Setter
+    private String explain;
 
     /**
      * Constructs a `NonTerminalNode` with the given non-terminal symbol.
@@ -34,6 +37,10 @@ public class NonTerminalNode extends ParseNode<NonTerminal>{
         super(symbol);
     }
 
+    public String explain(){
+        return this.explain;
+    }
+
     /**
      * Returns the location in the source code corresponding to this non-terminal node.
      * The location is based on the first and last child nodes.
@@ -42,7 +49,7 @@ public class NonTerminalNode extends ParseNode<NonTerminal>{
      */
     @Override
     public Location location() {
-        return new Location(this.nodes.get(0).location().start(),this.nodes.get(this.nodes.size()-1).location().end(), this.nodes.get(0).location().line());
+        return new Location(this.nodes.get(0).location().start(), this.nodes.get(this.nodes.size() - 1).location().end(), this.nodes.get(0).location().line());
     }
 
     /**
@@ -50,7 +57,7 @@ public class NonTerminalNode extends ParseNode<NonTerminal>{
      *
      * @return True if this is the start node, otherwise false.
      */
-    public boolean isStart(){
+    public boolean isStart() {
         return this.symbol.type().isStart();
     }
 
@@ -63,12 +70,12 @@ public class NonTerminalNode extends ParseNode<NonTerminal>{
      */
     public void addNode(ParseNode child, int index) {
         child.setParent(this);
-        if(child.parseTree()!=this.parserTree) {
+        if (child.parseTree() != this.parserTree) {
             child.setParseTree(this.parserTree);
         }
-        if(index==-1){
+        if (index == -1) {
             this.nodes.add(child);
-        }else {
+        } else {
             this.nodes.add(index, child);
         }
     }
@@ -79,7 +86,7 @@ public class NonTerminalNode extends ParseNode<NonTerminal>{
      * @param child The child node to add.
      */
     public void addNode(ParseNode child) {
-        addNode(child,-1);
+        addNode(child, -1);
     }
 
     /**
@@ -100,7 +107,7 @@ public class NonTerminalNode extends ParseNode<NonTerminal>{
      *
      * @return The non-terminal symbol.
      */
-    public NonTerminal nonTerminal(){
+    public NonTerminal nonTerminal() {
         return this.symbol.type();
     }
 
@@ -132,7 +139,7 @@ public class NonTerminalNode extends ParseNode<NonTerminal>{
      * @param index The index of the child node.
      * @return The child node at the specified index.
      */
-    public ParseNode node(int index){
+    public ParseNode node(int index) {
         return this.nodes().get(index);
     }
 
@@ -153,28 +160,29 @@ public class NonTerminalNode extends ParseNode<NonTerminal>{
      * @param nodes The list of nodes to add.
      * @param index The position to insert the nodes.
      */
-    public void addNodes(List<ParseNode> nodes,int index) {
+    public void addNodes(List<ParseNode> nodes, int index) {
         int i = index;
         for (ParseNode node : nodes) {
-            this.addNode(node,i++);
+            this.addNode(node, i++);
         }
     }
+
     /**
      * Returns the index of the specified node within this non-terminal's child nodes.
      *
      * @param node The node to search for.
      * @return The index of the node, or -1 if not found.
      */
-    public int indexOf(ParseNode node){
+    public int indexOf(ParseNode node) {
         return this.nodes.indexOf(node);
     }
 
     @Override
     public String toString() {
-        if(this.nodes.size()==0) return this.symbol.name();
+        if (this.nodes.size() == 0) return this.symbol.name();
         StringBuilder display = new StringBuilder();//this.nodes.size()>1?super.toString():"";
         for (ParseNode node : this.nodes) {
-            display.append(node+" ");
+            display.append(node + " ");
         }
         return display.toString();
     }
@@ -186,7 +194,7 @@ public class NonTerminalNode extends ParseNode<NonTerminal>{
      */
     @Override
     public String lexeme() {
-        return this.toString().replace(" ","");
+        return this.toString().replace(" ", "");
     }
 
 

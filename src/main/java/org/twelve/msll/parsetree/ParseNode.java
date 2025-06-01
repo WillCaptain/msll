@@ -14,6 +14,7 @@ public abstract class ParseNode<T extends SymbolType> {
     protected Symbol<T> symbol;
     protected NonTerminalNode parent;
     private final int index;
+
     private Map<String,Object> tag = new HashMap<>();
 
     public ParseNode(Symbol<T> symbol){

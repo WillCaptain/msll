@@ -261,8 +261,9 @@ public class Grammar {
         Grammar ai = this.addGrammar(grammars,aiName);
         List<Symbol> symbols = left.symbols();
         symbols.remove(0);
-        symbols.add(new Symbol<>(nonTerminal, aiiName));
-        new Production(ai, symbols, nonTerminals, terminals);
+        symbols.add(new Symbol<>(NonTerminals.IGNORED, aiiName));
+//        new Production(ai, symbols, nonTerminals, terminals);
+        new Production(ai, symbols, nonTerminals, terminals,left.explain(),left.assoc());
 
         left.grammar().productions().remove(left);
         return ai;

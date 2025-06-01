@@ -248,4 +248,10 @@ public class MyGrammarTest {
         assertEquals(1, parser.totalStackSize());//same as ll(1)
     }
 
+    @Test
+    void test(){
+        ParserTree tree = builder.createParser("a.b").parse();
+        assertEquals(1,1);
+    }
+
 }

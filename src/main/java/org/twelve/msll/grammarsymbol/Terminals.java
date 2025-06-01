@@ -139,7 +139,7 @@ public class Terminals implements SymbolTypes<Terminal> {
         terminals.addTerminal(Constants.REGEX, new RegexString("/\\\".+\\\"/"));
         terminals.addTerminal(Constants.FRAGMENT.toUpperCase(), Constants.FRAGMENT);
         terminals.addTerminal(Constants.PREDICATE, new RegexString("\\{[a-zA-Z0-9_.()\"]*\\}"));
-        terminals.addTerminal(Constants.EXPLAIN, new RegexString("#\\s*\\w*"));
+        terminals.addTerminal(Constants.EXPLAIN, new RegexString("#\\s*[\\w,\\s]*"));
         terminals.addTerminal(Constants.PLUS_STR, Constants.PLUS);
         terminals.addTerminal(Constants.LEFT.toUpperCase(), Constants.LEFT);
         terminals.addTerminal(Constants.RIGHT.toUpperCase(), Constants.RIGHT);

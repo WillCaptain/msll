@@ -106,6 +106,9 @@ public class ParserTree {
             }
         }
         if (node.symbol().type() == NonTerminals.IGNORED) {
+            if(node.explain()!=null && !node.explain().isEmpty()) {
+                return;
+            }
             int index = parent.removeNode(node);
             parent.addNodes(node.nodes(), index);
         }
