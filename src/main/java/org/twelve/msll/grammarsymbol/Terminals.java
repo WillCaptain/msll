@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 /**
  * Stores all terminal symbols for a specific parser.
  * Each terminal includes metadata for token matching, which can either be a full match string or a regex pattern.
- *
+ * <p>
  * When matching a token, three principles apply in case of multiple matches:
  * 1. **Maximal Munch**: The longest matching token is selected.
  * 2. **Keyword Priority**: If multiple matches exist, string definitions (keywords) have a higher priority than regex matches.
@@ -55,7 +55,7 @@ public class Terminals implements SymbolTypes<Terminal> {
      * Method to get terminals for MyParser
      */
     public synchronized static Terminals my() {
-        if(myTerminals==null){
+        if (myTerminals == null) {
             myTerminals = new Terminals();
             myTerminals.addTerminal(Constants.STRING, new RegexString("(\\\"[^\"]*\\\")"));
             myTerminals.addTerminal(Constants.PLUS_PLUS_STR, Constants.PLUS_PLUS);
@@ -99,7 +99,7 @@ public class Terminals implements SymbolTypes<Terminal> {
      * Method to get terminals for parser grammar parsing
      */
     public synchronized static Terminals parser() {
-        if(parserTerminals ==null) {
+        if (parserTerminals == null) {
             parserTerminals = new Terminals();
             parserTerminals.addTerminal(Constants.PARSER_GRAMMAR, new RegexString("^parser\\s+grammar\\b"));
             parserTerminals.addTerminal(Constants.STRING, new RegexString("(?<quote>['\"])[^\"']*\\k<quote>"));
@@ -114,8 +114,8 @@ public class Terminals implements SymbolTypes<Terminal> {
     /**
      * Method to get terminals for lexer grammar parsing
      */
-    public synchronized static Terminals lexer(){
-        if(lexerTerminals ==null){
+    public synchronized static Terminals lexer() {
+        if (lexerTerminals == null) {
             lexerTerminals = new Terminals();
             lexerTerminals.addTerminal(Constants.STRING, new RegexString("(?<quote>['\"])[^\"']*\\k<quote>"));
             lexerTerminals.addTerminal(Constants.LEXER_GRAMMAR, new RegexString("^lexer\\s+grammar\\b"));
@@ -161,9 +161,9 @@ public class Terminals implements SymbolTypes<Terminal> {
     /**
      * Matches the given input string to the terminal rules and returns the list of matched tokens.
      *
-     * @param line        The input line to be tokenized.
-     * @param lineNum     The current line number.
-     * @param charIndex   The current character index.
+     * @param line      The input line to be tokenized.
+     * @param lineNum   The current line number.
+     * @param charIndex The current character index.
      * @return A list of matched tokens.
      * @throws LexerException if an unexpected character is found.
      */
@@ -187,9 +187,9 @@ public class Terminals implements SymbolTypes<Terminal> {
                     String name = terminal.tokenName();
                     String value = matcher.group(name);
                     int matchLength = value.length();
-                    if (matchLength > maxMatchLength||(matchLength == maxMatchLength && !terminal.isRegex())) {
+                    if (matchLength > maxMatchLength || (matchLength == maxMatchLength && !terminal.isRegex())) {
                         maxMatchLength = matchLength;
-                        bestMatch = new Token(terminal, value,new Location(matcher.start(name)+position, matcher.end(name)+position, new Line(lineNum, charIndex)));
+                        bestMatch = new Token(terminal, value, new Location(matcher.start(name) + position, matcher.end(name) + position, new Line(lineNum, charIndex)));
                     }
                     // If same length, prioritize the first defined terminal
                     else if (matchLength == maxMatchLength && bestMatch != null) {
@@ -205,9 +205,13 @@ public class Terminals implements SymbolTypes<Terminal> {
                     tokens.add(bestMatch);
                 }
                 position = bestMatch.location().lineEnd();
-                if(bestMatch.terminal().name.equals(Constants.EOL_STR) && position == length) break;
+                if (bestMatch.terminal().name.equals(Constants.EOL_STR) && position == length) break;
             } else {
-                throw new LexerException("Unexpected character at position " + position + ": '" + line.charAt(position) + "'");
+                throw new LexerException("Unexpected character at position " + position + "\n " +
+                        line.substring(0, position > 0 ? position  : 0)
+                        + "`" + line.charAt(position) + "`" +
+                        line.substring(position, line.length() - 1)
+                );
             }
         }
 

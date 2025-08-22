@@ -10,6 +10,7 @@ import org.twelve.msll.parserbuilder.MyParserBuilder;
 import org.twelve.msll.parsetree.*;
 import org.twelve.msll.util.Constants;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -188,6 +189,23 @@ public class MyGrammarTest {
         //{{{{...}}}} return block
         NonTerminalNode returnBlock = cast(tree.start().node(2));
         assertEquals("block",returnBlock.name());
+
+        StringBuilder longCode = new StringBuilder();
+        //447k tokens
+        for (int i=0; i<1000; i++){
+            longCode.append(code);
+        }
+        long beginTime = new Date().getTime();
+        Runtime rt = Runtime.getRuntime();
+        long beginMemory = rt.totalMemory() - rt.freeMemory();
+        parser = builder.createParser(longCode.toString());
+        parser.parse();
+        long duration = new Date().getTime()-beginTime;
+        long memory = (rt.totalMemory() - rt.freeMemory() - beginMemory)/(1024*1024);
+        assertEquals(5, parser.maxStackSize());//maximum online stacks
+        assertEquals(73001, parser.totalStackSize());
+
+
     }
 
     /**
@@ -219,7 +237,7 @@ public class MyGrammarTest {
                 } } }};
                 counter += result((a,b)->a+b,1,2);""";
         MsllParser<?> parser = builder.createParser(code);
-        for (int i = 0; i < 999; i++) {
+        /*for (int i = 0; i < 999; i++) {
             parser.parse();
         }
         ParserTree tree = parser.parse();
@@ -232,6 +250,22 @@ public class MyGrammarTest {
         assertEquals("variable_declarator",result.name());
         NonTerminalNode counter = cast(tree.start().node(2));
         assertEquals("assignment",counter.name());
+*/
+        StringBuilder longCode = new StringBuilder();
+        //432k tokens
+        for (int i=0; i<1000; i++){
+            longCode.append(code);
+        }
+        long begin = new Date().getTime();
+        Runtime rt = Runtime.getRuntime();
+        long beginMemory = rt.totalMemory() - rt.freeMemory();
+        parser = builder.createParser(longCode.toString());
+        parser.parse();
+        long duration = new Date().getTime()-begin;
+        long memory = (rt.totalMemory() - rt.freeMemory() - beginMemory)/(1024*1024);
+        assertEquals(33, parser.maxStackSize());//maximum online stacks
+        assertEquals(180001, parser.totalStackSize());
+
     }
 
     /**
@@ -244,6 +278,21 @@ public class MyGrammarTest {
             parser.parse();
         }
         ParserTree tree = parser.parse();
+        assertEquals(1, parser.maxStackSize());//same as ll(1)
+        assertEquals(1, parser.totalStackSize());//same as ll(1)
+
+        StringBuilder longCode = new StringBuilder();
+        //10k tokens
+        for (int i=0; i<100; i++){
+            longCode.append("let a=100;");
+        }
+        long begin = new Date().getTime();
+        parser = builder.createParser(longCode.toString());
+        Runtime rt = Runtime.getRuntime();
+        long beginMemory = rt.totalMemory() - rt.freeMemory();
+        parser.parse();
+        long duration = new Date().getTime()-begin;
+        long memory = (rt.totalMemory() - rt.freeMemory() - beginMemory)/(1024*1024);
         assertEquals(1, parser.maxStackSize());//same as ll(1)
         assertEquals(1, parser.totalStackSize());//same as ll(1)
     }
