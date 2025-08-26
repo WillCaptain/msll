@@ -37,8 +37,8 @@ public class NonTerminalNode extends ParseNode<NonTerminal> {
         super(symbol);
     }
 
-    public String explain(){
-        return this.explain;
+    public String explain() {
+        return this.explain == null ? null : this.explain.trim();
     }
 
     /**
