@@ -1,7 +1,12 @@
 package org.twelve.msll.parsetree;
 
+import org.twelve.msll.exception.ParseError;
 import org.twelve.msll.grammarsymbol.NonTerminals;
 import org.twelve.msll.util.Tool;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 import static org.twelve.msll.util.Tool.cast;
 
@@ -20,6 +25,8 @@ public class ParserTree {
      * in parser tree, a root node is required
      */
     private final NonTerminalNode start;
+
+    private List<ParseError> errors = new ArrayList<>();
 
     /**
      * Constructs a `ParserTree` with the specified root node.
@@ -117,5 +124,17 @@ public class ParserTree {
     @Override
     public String toString() {
         return this.start.toString();
+    }
+
+    public ParseError addError(ParseError error) {
+        if(error.node()==null) return error;
+        // Deduplicate errors by node ID and error code
+        if (errors.stream().noneMatch(e ->
+                Objects.equals(e.node().id(), error.node().id()) &&
+                        e.errorCode() == error.errorCode())) {
+            this.errors.add(error);
+            return error;
+        }
+        return null;
     }
 }

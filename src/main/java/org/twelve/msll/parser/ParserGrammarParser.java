@@ -222,7 +222,7 @@ public class ParserGrammarParser extends G4Parser<ParserGrammarTree> {
      */
     private void createProduction(NonTerminalNode node, NonTerminalNode parent, NonTerminalNode root, ParserGrammarParser.TriConsumer<NonTerminalNode, NonTerminalNode, TerminalNode> handler) {
 
-        String name = node.name() + "_" + node.index() + "'";//the created non terminal is an ignored type end with '
+        String name = node.name() + "_" + node.id() + "'";//the created non terminal is an ignored type end with '
         NonTerminalNode grammar = new NonTerminalNode(new Symbol<>(this.nonTerminals.fromName(Constants.GRAMMAR)));
         NonTerminalNode head = new NonTerminalNode(new Symbol<>(getHead()));
         TerminalNode id = new TerminalNode(new Symbol<>(this.terminals.fromName(Constants.ID)));

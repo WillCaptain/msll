@@ -6,20 +6,21 @@ import org.twelve.msll.parser.Symbol;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class ParseNode<T extends SymbolType> {
-    private static int counter = 0;
+    private static AtomicLong counter = new AtomicLong();
     protected ParserTree parserTree;
     private Flag flag;
     protected Symbol<T> symbol;
     protected NonTerminalNode parent;
-    private final int index;
+    private final long id;
 
     private Map<String,Object> tag = new HashMap<>();
 
     public ParseNode(Symbol<T> symbol){
         this.symbol = symbol;
-        this.index = counter++;
+        this.id = counter.getAndIncrement();
     }
 
     public void setFlag(Flag flag) {
@@ -52,7 +53,7 @@ public abstract class ParseNode<T extends SymbolType> {
         this.parserTree = parserTree;
     }
 
-    protected ParserTree parseTree() {
+    public ParserTree parseTree() {
         return this.parserTree;
     }
 
@@ -60,8 +61,8 @@ public abstract class ParseNode<T extends SymbolType> {
     public String toString() {
         return this.symbol.toString();
     }
-    public int index() {
-        return this.index;
+    public long id() {
+        return this.id;
     }
 
     public void setTag(String key, Object value) {
@@ -72,4 +73,5 @@ public abstract class ParseNode<T extends SymbolType> {
     }
 
     public abstract String lexeme();
+
 }

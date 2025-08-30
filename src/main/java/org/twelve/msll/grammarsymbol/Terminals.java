@@ -89,7 +89,8 @@ public class Terminals implements SymbolTypes<Terminal> {
             myTerminals.addTerminal(Constants.POWER_STR, Constants.POWER);
 
             myTerminals.addTerminal(Constants.ENTER, new RegexString("\\S* \\n"));
-            myTerminals.addTerminal(Constants.NUMBER, new RegexString("(?:|(?<=[\\=\\<\\>])\\s*-\\s*)\\d+(?:\\.\\d+)?(?![\\.])"));
+            myTerminals.addTerminal(Constants.DOUBLE, new RegexString("(?<![\\w.])-?\\d+(?:\\.\\d+)?(?!\\.\\d)[d](?!\\w)"));
+            myTerminals.addTerminal(Constants.FLOAT, new RegexString("(?<![\\w.])-?\\d+(?:\\.\\d+)?(?!\\.\\d)[f](?!\\w)"));
 
         }
         return myTerminals;
