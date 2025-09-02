@@ -186,7 +186,7 @@ public class ParserTreeGrammarBuilder extends GrammarBuilder {
                         }
                         break;
                     case Constants.COMMENT:
-                        System.out.println("comment: \"" + n.lexeme().substring(2) + "\" is ignored");
+//                        System.out.println("comment: \"" + n.lexeme().substring(2) + "\" is ignored");
                         break;
                     case Constants.EXPLAIN:
                         explain = n.lexeme().substring(1);
@@ -198,7 +198,7 @@ public class ParserTreeGrammarBuilder extends GrammarBuilder {
                         symbols.add(new Symbol(terminals.addIfAbsent(new Terminal(Constants.PREDICATE_ABLE + "_" + predicateId.incrementAndGet(), n.name())), n.lexeme()));
                         break;
                     default:
-                        System.out.println("some symbol not matched!!");
+//                        System.out.println("some symbol not matched!!");
                         break;
                 }
             }
