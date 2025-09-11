@@ -68,7 +68,7 @@ public class ParserTree {
      * @param node The current non-terminal node.
      */
     private void clearEmptyNonTerminals(NonTerminalNode node) {
-        if (node.nodes().size() == 0) {
+        if (node.nodes().size() == 0 && node.parent!=null) {
             node.parent.removeNode(node);
         } else {
             for (ParseNode n : node.nodes()) {
@@ -86,7 +86,7 @@ public class ParserTree {
      * @param node The current parse node.
      */
     private void clearFlags(ParseNode node) {
-        if (node.flag().expired()) {
+        if (node.flag().expired() && node.parent()!=null) {
             node.parent().removeNode(node);
         } else {
             if (node instanceof NonTerminalNode)
@@ -136,5 +136,25 @@ public class ParserTree {
             return error;
         }
         return null;
+    }
+
+    public List<ParseNode> ambiguousNodes(){
+        List<ParseNode> nodes = new ArrayList<>();
+        findAmbiguousNodes(nodes,this.start);
+        return nodes;
+    }
+
+    private void findAmbiguousNodes(List<ParseNode> nodes, ParseNode parent) {
+        if(parent.flag().isAmbiguous()){
+            nodes.add(parent);
+        }else{
+            if(parent instanceof NonTerminalNode) {
+                for (ParseNode node : ((NonTerminalNode) parent).nodes()) {
+                    if (node instanceof NonTerminalNode) {
+                        findAmbiguousNodes(nodes, cast(node));
+                    }
+                }
+            }
+        }
     }
 }

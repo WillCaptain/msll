@@ -1,5 +1,11 @@
 package org.twelve.msll.parsetree;
 
+import lombok.Getter;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * The MSLL stack flag associated with parse nodes.
  * This flag tracks whether a stack has failed during the parsing process.
@@ -12,12 +18,60 @@ package org.twelve.msll.parsetree;
  *
  * @author huizi 2024
  */
-public interface Flag {
+public class Flag {
+    private static final AtomicInteger counter = new AtomicInteger(0);
+    private final int id;
+    private boolean expired = false;
+    private final Flag parent;
+    private final List<Flag> children = new ArrayList<>();
+    @Getter
+    private boolean ambiguous = false;
+
     /**
-     * Indicates whether the stack match has failed, causing the flag to expire.
-     * Expired flags signal the parser to remove the corresponding nodes from the parse tree.
+     * Constructor that links a parent flag to this flag.
      *
-     * @return true if the flag is expired, false otherwise.
+     * @param parent The parent `StackFlag` (can be null).
      */
-    boolean expired();
+    public Flag(Flag parent) {
+        this.parent = parent;
+        if (parent != null) {
+            parent.children.add(this);
+        }
+        this.id = counter.getAndIncrement();
+    }
+
+    /**
+     * Checks if this flag is expired.
+     *
+     * @return True if the flag is expired, false otherwise.
+     */
+    public boolean expired() {
+        return this.expired;
+    }
+
+    private void setAmbiguous() {
+        this.ambiguous = true;
+    }
+
+    public void setAmbiguous(Flag aligned){
+        Flag parent = this;
+        while (parent != aligned) {
+            parent.setAmbiguous();
+            parent = parent.parent();
+        }
+    }
+
+    public void expire() {
+        this.expired = true;
+        if (this.parent != null) {
+            this.parent.children.remove(this);
+            if (this.parent.children.isEmpty()) {
+                this.parent.expire();
+            }
+        }
+    }
+
+    public Flag parent() {
+        return this.parent;
+    }
 }

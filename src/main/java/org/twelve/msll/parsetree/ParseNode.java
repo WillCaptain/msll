@@ -73,5 +73,4 @@ public abstract class ParseNode<T extends SymbolType> {
     }
 
     public abstract String lexeme();
-
 }

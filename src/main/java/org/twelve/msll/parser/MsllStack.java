@@ -1,21 +1,24 @@
 package org.twelve.msll.parser;
 
+import lombok.Setter;
+import org.twelve.msll.lexer.Token;
 import org.twelve.msll.parsetree.Flag;
 import org.twelve.msll.parsetree.ParseNode;
+import org.twelve.msll.util.GrammarAmbiguity;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * This class represents a stack used in the Multi-Stack LL (MSLL) parsing approach.
- *
+ * <p>
  * The stack holds `ParseNode` objects, and each stack instance maintains a `StackFlag` to indicate whether the
  * stack is expired (due to mismatches during multi-stack parsing) or still active. The stack flag also attaches
  * to related nodes in the parse tree, allowing for dynamic removal of expired nodes when the stack is expired.
- *
+ * <p>
  * Expired stacks are freed and their associated parse nodes are removed from the parse tree. This mechanism supports
  * the MSLL parser's ability to manage multiple parsing paths and handle parsing errors effectively.
- *
+ * <p>
  * huizi 2024
  */
 public class MsllStack extends Stack<ParseNode> {
@@ -30,7 +33,8 @@ public class MsllStack extends Stack<ParseNode> {
     /**
      * Unique index identifying this particular stack
      */
-    private final int index;
+    private final int id;
+    private final String grammarName;
     /**
      * Indicates if the stack is currently occupied (in use)
      */
@@ -38,10 +42,14 @@ public class MsllStack extends Stack<ParseNode> {
     /**
      * The flag indicating the status (active/expired) of this stack and its related nodes
      */
-    private StackFlag flag;
+    private Flag flag;
+
+    private Map<ParseNode, GrammarAmbiguity> batches = new HashMap<>();
+    private Map<ParseNode, GrammarAmbiguity> parentBatches = new HashMap<>();
+
     /**
      * Applies and returns an available stack, optionally copying a parent stack if provided.
-     *
+     * <p>
      * This method either reuses an available (unoccupied) stack or creates a new one if none are available.
      * If a parent stack is provided, the current stack is populated with the parent stack's nodes and inherits
      * the parent's `StackFlag`.
@@ -49,58 +57,72 @@ public class MsllStack extends Stack<ParseNode> {
      * @param parent The parent stack to duplicate (can be null).
      * @return The applied `MsllStack`.
      */
-    public static MsllStack apply(MsllStack parent) {
+    public static MsllStack apply(MsllStack parent, GrammarAmbiguity grammarAmbiguity, String grammarName) {
         Optional<MsllStack> stack = all.stream().filter(s -> !s.occupied).findFirst();
         MsllStack s;
         if (stack.isPresent()) {
             s = stack.get();
+            s.addBatch(grammarAmbiguity);
         } else {
-            s = new MsllStack();
+            s = new MsllStack(grammarAmbiguity, grammarName);
         }
         s.occupied = true;
 
-        if(parent!=null) {
-            s.flag = new StackFlag(parent.flag);
+        if (parent != null) {
+            s.flag = new Flag(parent.flag);
             s.addAll(parent);
-        }else{
-            s.flag = new StackFlag(null);
+            s.parentBatches = parent.batches();
+        } else {
+            s.flag = new Flag(null);
         }
         return s;
     }
+
+    private void addBatch(GrammarAmbiguity grammarAmbiguity) {
+        if (grammarAmbiguity == null) return;
+        this.batches.put(grammarAmbiguity.checkNode(), grammarAmbiguity);
+    }
+
     /**
      * Private constructor that assigns a unique index to the stack and adds it to the list of all stacks.
      */
-    private MsllStack() {
-        this.index = counter.incrementAndGet();
+    private MsllStack(GrammarAmbiguity grammarAmbiguity, String grammarName) {
+        this.id = counter.incrementAndGet();
+        this.grammarName = grammarName;
         all.add(this);
+        this.addBatch(grammarAmbiguity);
     }
 
+
     public static MsllStack apply() {
-        return apply(null);
+        return apply(null, null, "");
     }
+
     /**
      * Resets the stack system by clearing all existing stacks.
-     *
+     * <p>
      * This method clears all active and available stacks, typically used to reset the parsing system
      * before starting a new parsing operation.
      */
     public static void reset() {
         all.clear();
     }
+
     /**
      * Frees the stack by marking it as unoccupied and clearing its contents.
-     *
+     * <p>
      * This method is called when a stack is no longer needed in the parsing process, making it
      * available for reuse in future parsing operations.
      */
     public void free() {
         this.occupied = false;
         this.clear();
+        this.batches.clear();
     }
 
     /**
      * Marks the stack as expired and frees it.
-     *
+     * <p>
      * When a stack is marked as expired (due to mismatches during parsing), its associated
      * `StackFlag` is also marked as expired. The stack is then freed and its contents are cleared.
      */
@@ -109,9 +131,10 @@ public class MsllStack extends Stack<ParseNode> {
         this.free();
     }
 
+
     /**
      * Pushes a `ParseNode` onto the stack and attaches the stack's flag to the node.
-     *
+     * <p>
      * Each `ParseNode` added to the stack is tagged with the stack's flag, allowing the parser to
      * track and manage the node's status (active or expired) during the parsing process.
      *
@@ -129,8 +152,9 @@ public class MsllStack extends Stack<ParseNode> {
      */
     @Override
     public synchronized int hashCode() {
-        return Objects.hash(this.index,this);
+        return Objects.hash(this.id, this);
     }
+
     /**
      * Compares two stacks by their unique index to determine equality for map match
      *
@@ -139,55 +163,51 @@ public class MsllStack extends Stack<ParseNode> {
      */
     @Override
     public synchronized boolean equals(Object stack) {
-        if(stack instanceof MsllStack) {
-            return ((MsllStack)stack).index == this.index;
-        }else{
+        if (stack instanceof MsllStack) {
+            return ((MsllStack) stack).id == this.id;
+        } else {
             return false;
         }
     }
+
+    public ParseNode pop(Token token) {
+        ParseNode popped = super.pop();
+        GrammarAmbiguity grammarAmbiguity = null;
+        if (!this.isEmpty()) {
+            grammarAmbiguity = this.batches().get(popped);
+        }
+        if (grammarAmbiguity != null) {
+            grammarAmbiguity.makeItDone(token, this);
+        }
+        return popped;
+    }
+
+    private Map<ParseNode, GrammarAmbiguity> batches() {
+        Map<ParseNode, GrammarAmbiguity> bs = new HashMap<>();
+        bs.putAll(this.batches);
+        bs.putAll(this.parentBatches);
+        return bs;
+    }
+
+    public void setAmbiguous(Flag flag) {
+        this.flag.setAmbiguous(flag);
+//        Flag parent = this.flag;
+//        while (parent != flag) {
+//            parent.setAmbiguous();
+//            parent = parent.parent();
+//        }
+//        if (isFree) {
+            this.free();
+//        }
+    }
+
+//    public void setAmbiguous(Object flag) {
+//        this.setAmbiguous(flag, true);
+//    }
+
+    public Flag flag() {
+        return this.flag;
+    }
 }
 
-/**
- * The `StackFlag` class manages the active or expired status of a stack.
- *
- * A `StackFlag` is attached to each `MsllStack` and tracks whether the stack is active or has expired.
- * It also manages relationships between parent and child flags, ensuring that when a parent flag expires,
- * its children are also handled appropriately.
- */
-class StackFlag implements Flag {
 
-    private boolean expired = false;
-    private final StackFlag parent;
-    private final List<StackFlag> children = new ArrayList<>();
-
-    /**
-     * Constructor that links a parent flag to this flag.
-     *
-     * @param parent The parent `StackFlag` (can be null).
-     */
-    StackFlag(StackFlag parent) {
-        this.parent = parent;
-        if(parent!=null){
-            parent.children.add(this);
-        }
-    }
-    /**
-     * Checks if this flag is expired.
-     *
-     * @return True if the flag is expired, false otherwise.
-     */
-    @Override
-    public boolean expired() {
-        return this.expired;
-    }
-
-    public void expire(){
-        this.expired = true;
-        if (this.parent != null) {
-            this.parent.children.remove(this);
-            if (this.parent.children.isEmpty()) {
-                this.parent.expire();
-            }
-        }
-    }
-}
