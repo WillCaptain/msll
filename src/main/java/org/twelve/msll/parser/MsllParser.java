@@ -180,6 +180,10 @@ public abstract class MsllParser<P extends ParserTree> {
         if (token == null) {//error in lexing
             throw new RuntimeException("something wrong in lexing...");
         }
+        if(!token.channel().isEmpty()){
+//            lineIndex.set(cursor);
+            return;
+        }
 
         List<MsllStack> all = new ArrayList<>();
         all.addAll(stackList);
@@ -264,7 +268,7 @@ public abstract class MsllParser<P extends ParserTree> {
      * @param line  The current line in the input source, used for error tracking and reporting.
      * @return A list of new or updated parsing stacks resulting from the matching process.
      */
-    private List<MsllStack> matchNonTerminalToken(MsllStack stack, NonTerminalNode node, Token token, String line) {
+    private List<MsllStack> matchNonTerminalToken(MsllStack stack, final NonTerminalNode node, Token token, String line) {
         Grammar grammar = grammars.get(node.name());
         List<Production> productions = this.predictTable.match(token, grammar, line).stream().filter(p -> p != null && !p.isEmpty()).collect(Collectors.toList());
         List<MsllStack> all = new ArrayList<>();

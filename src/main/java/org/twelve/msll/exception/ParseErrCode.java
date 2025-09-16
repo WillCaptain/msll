@@ -7,6 +7,6 @@ package org.twelve.msll.exception;
  * Each code should have a corresponding user-friendly message in resources.
  */
 public enum ParseErrCode {
-    // --- Syntax/Structure Errors ---
+    OPERATOR_MISMATCH, // --- Syntax/Structure Errors ---
     TYPE_DECLARED_ERROR
 }
