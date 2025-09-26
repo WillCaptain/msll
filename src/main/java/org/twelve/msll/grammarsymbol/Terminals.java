@@ -82,6 +82,7 @@ public class Terminals implements SymbolTypes<Terminal> {
             myTerminals.addTerminal(Constants.BANG_STR, Constants.BANG);
             myTerminals.addTerminal(Constants.EQUAL_STR, Constants.EQUAL);
             myTerminals.addTerminal(Constants.GREATER_STR, Constants.GREATER);
+            myTerminals.addTerminal(Constants.UNDER_LINE_STR, Constants.UNDER_LINE);
             myTerminals.addTerminal(Constants.LESS_STR, Constants.LESS);
             myTerminals.addTerminal(Constants.SLASH_STR, Constants.SLASH);
             myTerminals.addTerminal(Constants.AND_STR, Constants.AND);
@@ -157,6 +158,7 @@ public class Terminals implements SymbolTypes<Terminal> {
         terminals.addTerminal(Constants.LESS_STR, Constants.LESS);
         terminals.addTerminal(Constants.ASSOC.toUpperCase(), Constants.ASSOC);
         terminals.addTerminal(Constants.GREATER_STR, Constants.GREATER);
+        terminals.addTerminal(Constants.UNDER_LINE_STR, Constants.UNDER_LINE);
     }
 
     /**

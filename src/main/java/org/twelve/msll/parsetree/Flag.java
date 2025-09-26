@@ -24,7 +24,6 @@ public class Flag {
     private boolean expired = false;
     private final Flag parent;
     private final List<Flag> children = new ArrayList<>();
-    @Getter
     private boolean ambiguous = false;
 
     /**
@@ -49,6 +48,9 @@ public class Flag {
         return this.expired;
     }
 
+    public Boolean isAmbiguous(){
+        return this.ambiguous;
+    }
     private void setAmbiguous() {
         this.ambiguous = true;
     }

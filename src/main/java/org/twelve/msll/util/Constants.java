@@ -7,6 +7,7 @@ package org.twelve.msll.util;
  */
 public class Constants {
     public static final String UNDER_LINE = "_";
+    public static final String UNDER_LINE_STR = "UNDER_LINE";
     public static final String NUMBER = "NUMBER";
     public static final String DOUBLE = "DOUBLE";
     public static final String FLOAT = "FLOAT";
