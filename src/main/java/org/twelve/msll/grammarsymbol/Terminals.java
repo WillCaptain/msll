@@ -57,7 +57,8 @@ public class Terminals implements SymbolTypes<Terminal> {
     public synchronized static Terminals my() {
         if (myTerminals == null) {
             myTerminals = new Terminals();
-            myTerminals.addTerminal(Constants.STRING, new RegexString("(\\\"[^\"]*\\\")"));
+            // Support escape sequences (e.g. \n, \t, \") inside string literals
+            myTerminals.addTerminal(Constants.STRING, new RegexString("(\\\"(?:[^\\\"\\\\]|\\\\.)*\\\")"));
             myTerminals.addTerminal(Constants.PLUS_PLUS_STR, Constants.PLUS_PLUS);
             myTerminals.addTerminal(Constants.MINUS_MINUS_STR, Constants.MINUS_MINUS);
             myTerminals.addTerminal(Constants.BANG_EQUAL_STR, Constants.BANG_EQUAL);
@@ -203,17 +204,23 @@ public class Terminals implements SymbolTypes<Terminal> {
             }
 
             if (bestMatch != null) {
-//                if (!bestMatch.terminal().name().equals(Constants.WHITESPACE_STR)||this.keepWhiteSpace) {
                 if (!bestMatch.terminal().name().equals(Constants.WHITESPACE_STR)) {
                     tokens.add(bestMatch);
                 }
                 position = bestMatch.location().lineEnd();
                 if (bestMatch.terminal().name.equals(Constants.EOL_STR) && position == length) break;
             } else {
-                throw new LexerException("Unexpected character at position " + position + "\n " +
-                        line.substring(0, position > 0 ? position  : 0)
-                        + "`" + line.charAt(position) + "`" +
-                        line.substring(position, line.length() - 1)
+                // Build a clear, positioned error message
+                char badChar = line.charAt(position);
+                String before = line.substring(0, position);
+                String pointer = " ".repeat(position) + "^";
+                throw new LexerException(
+                        "Unexpected character '" + badChar + "'"
+                        + " at line " + lineNum + ", column " + position
+                        + System.lineSeparator()
+                        + "  " + line
+                        + System.lineSeparator()
+                        + "  " + pointer
                 );
             }
         }

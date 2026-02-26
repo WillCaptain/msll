@@ -1,8 +1,8 @@
 -------------------------------------------------------------------------------
 Test set: org.twelve.msll.MyGrammarTest
 -------------------------------------------------------------------------------
-Tests run: 11, Failures: 0, Errors: 11, Skipped: 0, Time elapsed: 1.581 s <<< FAILURE! -- in org.twelve.msll.MyGrammarTest
-org.twelve.msll.MyGrammarTest.test_flat -- Time elapsed: 0.148 s <<< ERROR!
+Tests run: 11, Failures: 0, Errors: 11, Skipped: 0, Time elapsed: 0.562 s <<< FAILURE! -- in org.twelve.msll.MyGrammarTest
+org.twelve.msll.MyGrammarTest.test_flat -- Time elapsed: 0.136 s <<< ERROR!
 org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.twelve.msll.util.Tool.lexerError(Tool.java:71)
 	at org.twelve.msll.grammar.ParserTreeGrammarBuilder.createNonTerminal(ParserTreeGrammarBuilder.java:175)
@@ -89,7 +89,7 @@ org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
 	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
 
-org.twelve.msll.MyGrammarTest.test_without_line_terminator -- Time elapsed: 0.110 s <<< ERROR!
+org.twelve.msll.MyGrammarTest.test_without_line_terminator -- Time elapsed: 0.054 s <<< ERROR!
 org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.twelve.msll.util.Tool.lexerError(Tool.java:71)
 	at org.twelve.msll.grammar.ParserTreeGrammarBuilder.createNonTerminal(ParserTreeGrammarBuilder.java:175)
@@ -176,7 +176,7 @@ org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
 	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
 
-org.twelve.msll.MyGrammarTest.test_comments_from_grammar -- Time elapsed: 0.080 s <<< ERROR!
+org.twelve.msll.MyGrammarTest.test_comments_from_grammar -- Time elapsed: 0.050 s <<< ERROR!
 org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.twelve.msll.util.Tool.lexerError(Tool.java:71)
 	at org.twelve.msll.grammar.ParserTreeGrammarBuilder.createNonTerminal(ParserTreeGrammarBuilder.java:175)
@@ -263,7 +263,7 @@ org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
 	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
 
-org.twelve.msll.MyGrammarTest.test_channel -- Time elapsed: 0.106 s <<< ERROR!
+org.twelve.msll.MyGrammarTest.test_channel -- Time elapsed: 0.043 s <<< ERROR!
 org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.twelve.msll.util.Tool.lexerError(Tool.java:71)
 	at org.twelve.msll.grammar.ParserTreeGrammarBuilder.createNonTerminal(ParserTreeGrammarBuilder.java:175)
@@ -350,7 +350,7 @@ org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
 	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
 
-org.twelve.msll.MyGrammarTest.test_with_line_terminator -- Time elapsed: 0.107 s <<< ERROR!
+org.twelve.msll.MyGrammarTest.test_with_line_terminator -- Time elapsed: 0.040 s <<< ERROR!
 org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.twelve.msll.util.Tool.lexerError(Tool.java:71)
 	at org.twelve.msll.grammar.ParserTreeGrammarBuilder.createNonTerminal(ParserTreeGrammarBuilder.java:175)
@@ -437,7 +437,7 @@ org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
 	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
 
-org.twelve.msll.MyGrammarTest.test_comment_with_command -- Time elapsed: 0.139 s <<< ERROR!
+org.twelve.msll.MyGrammarTest.test_comment_with_command -- Time elapsed: 0.044 s <<< ERROR!
 org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.twelve.msll.util.Tool.lexerError(Tool.java:71)
 	at org.twelve.msll.grammar.ParserTreeGrammarBuilder.createNonTerminal(ParserTreeGrammarBuilder.java:175)
@@ -524,7 +524,7 @@ org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
 	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
 
-org.twelve.msll.MyGrammarTest.test_grammar_name -- Time elapsed: 0.156 s <<< ERROR!
+org.twelve.msll.MyGrammarTest.test_grammar_name -- Time elapsed: 0.041 s <<< ERROR!
 org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.twelve.msll.util.Tool.lexerError(Tool.java:71)
 	at org.twelve.msll.grammar.ParserTreeGrammarBuilder.createNonTerminal(ParserTreeGrammarBuilder.java:175)
@@ -611,7 +611,7 @@ org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
 	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
 
-org.twelve.msll.MyGrammarTest.test_deep_layers -- Time elapsed: 0.148 s <<< ERROR!
+org.twelve.msll.MyGrammarTest.test_deep_layers -- Time elapsed: 0.038 s <<< ERROR!
 org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.twelve.msll.util.Tool.lexerError(Tool.java:71)
 	at org.twelve.msll.grammar.ParserTreeGrammarBuilder.createNonTerminal(ParserTreeGrammarBuilder.java:175)
@@ -698,7 +698,7 @@ org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
 	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
 
-org.twelve.msll.MyGrammarTest.test -- Time elapsed: 0.155 s <<< ERROR!
+org.twelve.msll.MyGrammarTest.test -- Time elapsed: 0.036 s <<< ERROR!
 org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.twelve.msll.util.Tool.lexerError(Tool.java:71)
 	at org.twelve.msll.grammar.ParserTreeGrammarBuilder.createNonTerminal(ParserTreeGrammarBuilder.java:175)
@@ -785,7 +785,7 @@ org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
 	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
 
-org.twelve.msll.MyGrammarTest.test_grammar_options -- Time elapsed: 0.172 s <<< ERROR!
+org.twelve.msll.MyGrammarTest.test_grammar_options -- Time elapsed: 0.035 s <<< ERROR!
 org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.twelve.msll.util.Tool.lexerError(Tool.java:71)
 	at org.twelve.msll.grammar.ParserTreeGrammarBuilder.createNonTerminal(ParserTreeGrammarBuilder.java:175)
@@ -872,7 +872,7 @@ org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
 	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
 
-org.twelve.msll.MyGrammarTest.test_multi_layers -- Time elapsed: 0.251 s <<< ERROR!
+org.twelve.msll.MyGrammarTest.test_multi_layers -- Time elapsed: 0.035 s <<< ERROR!
 org.twelve.msll.exception.LexerException: terminal NUMBER is not found
 	at org.twelve.msll.util.Tool.lexerError(Tool.java:71)
 	at org.twelve.msll.grammar.ParserTreeGrammarBuilder.createNonTerminal(ParserTreeGrammarBuilder.java:175)

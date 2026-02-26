@@ -89,17 +89,20 @@ public class PredictTable {
         }
         List<Production> productions = grammars.get(grammar);
         if (productions == null) {
-//        if (productions.size() == 0) {
             StringBuilder sb = new StringBuilder();
             for (List<Production> ps : grammars.values()) {
                 for (Production p : ps) {
                     sb.append(p).append(lineSeparator);
                 }
             }
+            String keywordHint = !terminal.isRegex()
+                    ? lineSeparator + "Hint: '" + token.lexeme() + "' is a reserved keyword and cannot be used as an identifier or in this position."
+                    : "";
             Tool.grammarError("token: " + terminal.name() + ":" + token.lexeme()
                     + " doesn't match any grammar definition at line: " + token.location().line().number()
                     + ", position from " + (token.location().start() - token.location().line().beginIndex()) + " to "
                     + (token.location().end() - token.location().line().beginIndex()) + lineSeparator + line
+                    + keywordHint
                     + lineSeparator + " the possible productions should be matched would be:" + sb);
         }
         return productions;

@@ -1,5 +1,6 @@
 package org.twelve.msll.parser;
 
+import org.twelve.msll.exception.AggregateGrammarSyntaxException;
 import org.twelve.msll.exception.GrammarSyntaxException;
 import org.twelve.msll.grammar.Grammar;
 import org.twelve.msll.grammar.Grammars;
@@ -123,6 +124,13 @@ public abstract class MsllParser<P extends ParserTree> {
      * @param terminals    The set of terminal symbols, representing the concrete tokens in the input.
      * @param reader       The input source to be parsed, typically providing the token stream.
      */
+    /**
+     * Root NonTerminalNode of the parse tree – kept as a field so that the
+     * panic-mode error-recovery logic can attach recovered statement subtrees
+     * without going through the (possibly abstract) parse-tree API.
+     */
+    private final NonTerminalNode startNode;
+
     public MsllParser(Grammars grammars, PredictTable predictTable, NonTerminals nonTerminals, Terminals terminals, Reader reader) {
         this.grammars = grammars;
         this.lexer = new RegexLexer(reader, terminals);
@@ -133,6 +141,7 @@ public abstract class MsllParser<P extends ParserTree> {
 
         NonTerminalNode start = new NonTerminalNode(new Symbol<>(grammars.getStart().nonTerminal()));
         stack.push(start);
+        this.startNode = start;
         this.parseTree = createParseTree(start);
         this.predictTable = predictTable;
         stacks = new MsllStacks();
@@ -332,10 +341,13 @@ public abstract class MsllParser<P extends ParserTree> {
             // 如果terminal匹配正确，将实际token放入该terminal node。一般对变量型node有价值，比如ID
             node.setToken(token);
         } else {
+            String keywordHint = (!token.terminal().isRegex() && node.terminal().name().equals("ID"))
+                    ? System.lineSeparator() + "Hint: '" + token.lexeme() + "' is a reserved keyword and cannot be used as an identifier."
+                    : "";
             Tool.grammarError(stack,
                     "unexpected token: " + token.lexeme() + ", expected token in " + (node.parent() == null ? node.name() : node.parent().name()) + " is "
                             + node.terminal().name() + ", at line:" + token.location().line().number() + ", position: " + token.location().lineStart() + " - "
-                            + token.location().lineEnd() + System.lineSeparator() + line);
+                            + token.location().lineEnd() + System.lineSeparator() + line + keywordHint);
         }
     }
 
@@ -381,21 +393,90 @@ public abstract class MsllParser<P extends ParserTree> {
     public P parse() {
         this.status = PARSE_STATUS.RUNNING;
         TokenBuffer tokens = lexer().scan();
+        List<GrammarSyntaxException> collectedErrors = new ArrayList<>();
         CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
             AtomicInteger lineIndex = new AtomicInteger(-1);
             AtomicInteger cursor = new AtomicInteger(0);
-//            while (lineIndex.get() == -1 || lineIndex.get() < tokens.size() - 1 || !tokens.get(tokens.size() - 1).terminal().name().equals(Constants.END_STR)) {
             while (cursor.get() == 0 || cursor.get() < tokens.size() || !tokens.get(tokens.size() - 1).terminal().name().equals(Constants.END_STR)) {
-                this.parseToken(tokens, cursor.getAndIncrement(), this.stacks, lineIndex);
+                try {
+                    this.parseToken(tokens, cursor.getAndIncrement(), this.stacks, lineIndex);
+                } catch (GrammarSyntaxException e) {
+                    // Panic-mode recovery: collect this error and try to resume
+                    // at the next statement boundary if the subclass supports it.
+                    String recoverySymbol = syntaxErrorRecoverySymbol();
+                    if (recoverySymbol != null && this.stacks.isEmpty()) {
+                        collectedErrors.add(e);
+                        // Advance past the next ';' (statement terminator)
+                        int pos = cursor.get();
+                        while (pos < tokens.size()) {
+                            Token t = tokens.get(pos++);
+                            if (t != null && t.terminal() != null
+                                    && !t.terminal().isRegex()
+                                    && t.terminal().pattern().equals(";")) {
+                                break;
+                            }
+                        }
+                        cursor.set(pos);
+                        // Rebuild stacks so we can parse the next statement
+                        if (!rebuildStacksForRecovery(recoverySymbol)) {
+                            throw e; // can't recover – propagate original error
+                        }
+                        this.status = PARSE_STATUS.RUNNING;
+                    } else {
+                        throw e;
+                    }
+                }
+            }
+            // After the whole token stream, re-raise collected errors as an aggregate
+            if (!collectedErrors.isEmpty()) {
+                throw new AggregateGrammarSyntaxException(collectedErrors);
             }
         });
         try {
             future.get();
         } catch (Exception e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof AggregateGrammarSyntaxException agg) {
+                throw agg;
+            }
+            if (cause instanceof GrammarSyntaxException gse) {
+                throw gse;
+            }
             e.printStackTrace();
-            throw new GrammarSyntaxException("parsing error...");
+            throw new GrammarSyntaxException("parsing error: " + e.getMessage());
         }
         return this.done();
+    }
+
+    /**
+     * Override in subclasses to enable panic-mode error recovery.
+     * Return the name of the grammar non-terminal that represents a
+     * top-level recoverable unit (e.g. {@code "statement"}).
+     * Returning {@code null} (the default) disables recovery.
+     */
+    protected String syntaxErrorRecoverySymbol() {
+        return null;
+    }
+
+    /**
+     * After a parse error, clears the stacks and pushes a fresh parse attempt
+     * for the given non-terminal, attaching it to the root parse-tree node.
+     * Returns {@code true} if recovery was set up successfully.
+     */
+    private boolean rebuildStacksForRecovery(String symbolName) {
+        Grammar grammar = grammars.get(symbolName);
+        if (grammar == null) return false;
+        // Clear all failed stacks
+        this.stacks.removeIf(s -> true);
+        // Create a fresh recovery node and wire it into the existing tree root
+        NonTerminalNode recoveryNode = new NonTerminalNode(new Symbol<>(grammar.nonTerminal()));
+        startNode.addNode(recoveryNode);
+        // Push onto a brand-new stack
+        MsllStack freshStack = MsllStack.apply();
+        freshStack.push(new EndNode(terminals));
+        freshStack.push(recoveryNode);
+        this.stacks.add(freshStack);
+        return true;
     }
 
     /**

@@ -52,6 +52,17 @@ public class MyParser extends MsllParser<MyParserTree> {
     }
 
     /**
+     * Enable statement-level panic-mode error recovery for the Outline/GCP language.
+     * After a syntax error the parser skips to the next {@code ;} and attempts to
+     * parse the following {@code statement}, so that all errors in a file are
+     * reported in a single compilation pass.
+     */
+    @Override
+    protected String syntaxErrorRecoverySymbol() {
+        return "statement";
+    }
+
+    /**
      * Finalizes and optimizes the parse tree after parsing is complete.
      *
      * This method calls the parent class's `done` method to obtain the raw parse tree, then applies a series of abstractions
