@@ -75,7 +75,11 @@ public abstract class Lexer {
 
     protected Consumer<Token> handleToken(TokenBuffer buffer) {
         return token -> {
-            buffer.addToken(token);
+            // Execute lexer commands (e.g. channel(HIDDEN)) BEFORE adding the token
+            // to the buffer. The parser thread wakes up as soon as addToken() calls
+            // notifyAll(), so the channel must already be set at that point or the
+            // race condition allows the parser to observe channel="" and process a
+            // HIDDEN token as if it were a normal one.
             String command = token.terminal().getCommand();
             if (command != null) {
                 String[] commands = command.substring(2).split(",");
@@ -84,6 +88,7 @@ public abstract class Lexer {
                     LexerCommands.execute(call, token);
                 }
             }
+            buffer.addToken(token);
         };
     }
 

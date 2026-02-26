@@ -26,6 +26,7 @@ public class MsllStack extends Stack<ParseNode> {
      * A list to keep track of all active and available MSLL stacks
      */
     private static List<MsllStack> all = new ArrayList<>();
+
     /**
      * Atomic counter to assign a unique index to each new stack
      */
@@ -176,7 +177,13 @@ public class MsllStack extends Stack<ParseNode> {
         if (!this.isEmpty()) {
             grammarAmbiguity = this.batches().get(popped);
         }
-        if (grammarAmbiguity != null) {
+        // Only use a non-hidden token as the disambiguation key.
+        // Hidden-channel tokens (e.g. SingleLineComment) must never be passed to
+        // makeItDone() because they are skipped by the parser loop and therefore
+        // arrive as the "previous token" for the first real token in a file.
+        // Using a hidden token as the key causes both ambiguous stacks to be
+        // incorrectly marked as ambiguous, leaving dead parse-tree nodes behind.
+        if (grammarAmbiguity != null && token.channel().isEmpty()) {
             grammarAmbiguity.makeItDone(token, this);
         }
         return popped;

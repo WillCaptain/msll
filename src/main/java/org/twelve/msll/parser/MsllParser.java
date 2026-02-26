@@ -359,6 +359,9 @@ public abstract class MsllParser<P extends ParserTree> {
             Tool.grammarError("the parser is not finished with correct input");
         }
         parseTree.polish();
+        // Reset the static MsllStack pool after every completed parse to prevent
+        // unbounded accumulation across successive parse() calls (O(n) scan fix).
+        MsllStack.reset();
         return parseTree;
     }
 
