@@ -33,7 +33,15 @@ public class MyParser extends MsllParser<MyParserTree> {
      * @param reader        The input source to be parsed (usually the source code of the custom language).
      */
     public MyParser(Grammars grammars, PredictTable predictTable, NonTerminals nonTerminals, Terminals terminals, Reader reader) {
-        super(grammars, predictTable, nonTerminals, terminals,reader);
+        super(grammars, predictTable, nonTerminals, terminals, reader);
+        // factor_expression_alpha' has a FIRST/FOLLOW conflict for '<': the token can either
+        // open a generic-type parameter list (x<T>) or start a relational comparison (x < 3).
+        // We register ONLY this (grammar, terminal) pair so epsilon-alongside is applied
+        // solely to '<' at factor_expression_alpha'.  Other tokens at that rule (e.g. '(' for
+        // function calls) must NOT be widened or they create false ambiguities.
+        this.epsilonAlongsideGrammars
+                .computeIfAbsent("factor_expression_alpha'", k -> new java.util.HashSet<>())
+                .add(org.twelve.msll.util.Constants.LESS_STR);
     }
 
     /**

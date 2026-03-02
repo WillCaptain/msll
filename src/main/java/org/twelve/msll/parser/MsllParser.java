@@ -113,6 +113,31 @@ public abstract class MsllParser<P extends ParserTree> {
     private PARSE_STATUS status = PARSE_STATUS.NOT_STARTED;
 
     /**
+     * Maps grammar rule names to the set of terminal names for which epsilon productions
+     * should be tried alongside non-epsilon ones (epsilon-alongside behaviour).
+     *
+     * <p>Normally the parser discards epsilon productions from the predict-table result when
+     * at least one non-epsilon production also matches the current token.  This causes a
+     * FIRST/FOLLOW conflict to always resolve to the non-epsilon interpretation, which is
+     * wrong when the epsilon path is the correct one.
+     *
+     * <p>By registering {@code (grammarName, terminalName)} pairs here, the parser will
+     * explore <em>both</em> the epsilon path and the non-epsilon path in parallel via
+     * {@link org.twelve.msll.util.GrammarAmbiguity} for that specific combination only.
+     * The incorrect path expires when it fails; the correct path wins.
+     *
+     * <p>The key advantage over a global flag is that only targeted conflicts are widened,
+     * preventing exponential stack growth and false ambiguities.  The canonical example is
+     * {@code factor_expression_alpha'} / {@code LESS}: the token {@code <} can either open
+     * a generic-type parameter list ({@code x<T>}) or start a relational comparison
+     * ({@code x < 3}).
+     *
+     * <p>Populated by user-language parsers (e.g. {@link MyParser}).
+     */
+    protected final java.util.Map<String, java.util.Set<String>> epsilonAlongsideGrammars
+            = new java.util.HashMap<>();
+
+    /**
      * Constructs a parser instance using the provided cfg formatted grammar and parsing components.
      * <p>
      * All arguments are injected through a parser builder, ensuring that the parser is initialized
@@ -279,7 +304,27 @@ public abstract class MsllParser<P extends ParserTree> {
      */
     private List<MsllStack> matchNonTerminalToken(MsllStack stack, final NonTerminalNode node, Token token, String line) {
         Grammar grammar = grammars.get(node.name());
-        List<Production> productions = this.predictTable.match(token, grammar, line).stream().filter(p -> p != null && !p.isEmpty()).collect(Collectors.toList());
+        // For grammars listed in epsilonAlongsideGrammars, epsilon productions are kept
+        // alongside non-epsilon ones so the parser can explore both paths in parallel via
+        // GrammarAmbiguity.  This resolves targeted FIRST/FOLLOW conflicts (e.g. '<' as
+        // both a generic-type opener and a relational operator in factor_expression_alpha'):
+        // one path fails and is expired; the surviving path wins.
+        //
+        // Epsilon is sorted FIRST so the non-epsilon explain() is written last in the loop
+        // below, ensuring it "wins" as the node's explain.
+        // For (grammarName, terminalName) pairs registered in epsilonAlongsideGrammars,
+        // keep epsilon productions alongside non-epsilon ones to resolve targeted FIRST/FOLLOW
+        // conflicts without global side-effects.  Epsilon is sorted first so the non-epsilon
+        // explain() is written last in the loop below (it "wins" as the node's explain).
+        java.util.Set<String> epsilonTerminals = epsilonAlongsideGrammars.get(grammar.name());
+        boolean epsilonAlongside = epsilonTerminals != null
+                && epsilonTerminals.contains(token.terminal().name());
+        List<Production> productions = this.predictTable.match(token, grammar, line).stream()
+                .filter(p -> p != null && (epsilonAlongside || !p.isEmpty()))
+                .collect(Collectors.toList());
+        if (epsilonAlongside) {
+            productions.sort((a, b) -> a.isEmpty() == b.isEmpty() ? 0 : (a.isEmpty() ? -1 : 1));
+        }
         List<MsllStack> all = new ArrayList<>();
         all.add(stack);
         if (productions.size() == 0) {
@@ -435,6 +480,9 @@ public abstract class MsllParser<P extends ParserTree> {
         try {
             future.get();
         } catch (Exception e) {
+            // Always reset the static MsllStack pool so that a failed parse does not
+            // leave stale entries that corrupt subsequent parse() calls.
+            MsllStack.reset();
             Throwable cause = e.getCause();
             if (cause instanceof AggregateGrammarSyntaxException agg) {
                 throw agg;

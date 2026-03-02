@@ -197,15 +197,8 @@ public class MsllStack extends Stack<ParseNode> {
     }
 
     public void setAmbiguous(Flag flag) {
-        this.flag.setAmbiguous(flag);
-//        Flag parent = this.flag;
-//        while (parent != flag) {
-//            parent.setAmbiguous();
-//            parent = parent.parent();
-//        }
-//        if (isFree) {
-            this.free();
-//        }
+        this.flag.expire();
+        this.free();
     }
 
 //    public void setAmbiguous(Object flag) {
