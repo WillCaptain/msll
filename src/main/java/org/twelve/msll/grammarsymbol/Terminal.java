@@ -5,6 +5,8 @@ import org.twelve.msll.parsetree.TerminalNode;
 import org.twelve.msll.util.Constants;
 import org.twelve.msll.util.RegexString;
 
+import java.util.regex.Pattern;
+
 import static org.twelve.msll.util.StringUtils.escapeRegex;
 
 /**
@@ -27,6 +29,8 @@ public class Terminal extends SymbolType {
     private String pattern;
     // An optional G4 command associated with this terminal (e.g., for lexer instructions).
     private String command = null;
+    // P1: compiled Pattern cache — built once on first use, invalidated when refresh() is called.
+    private volatile Pattern compiledPattern = null;
 
     /**
      * Constructor for a terminal with a literal match pattern.
@@ -54,10 +58,19 @@ public class Terminal extends SymbolType {
 
 
     /**
-     * Returns the regex used to match this terminal.
-     * If the terminal is defined by a literal string, special characters will be escaped.
-     *
-     * @return The regex pattern for matching this terminal.
+     * Returns the compiled {@link Pattern} for this terminal, building and caching it on first call.
+     * Eliminates the O(N_terminals × M_positions) Pattern.compile() cost in the lexer hot path.
+     */
+    public Pattern compiledPattern() {
+        if (compiledPattern == null) {
+            String inner = this.isRegex ? this.pattern.trim() : escapeRegex(this.pattern);
+            compiledPattern = Pattern.compile(String.format("(?<%s>%s)", this.tokenName(), inner));
+        }
+        return compiledPattern;
+    }
+
+    /**
+     * Returns the regex string for this terminal (kept for compatibility).
      */
     public String regex() {
         String regex = this.isRegex ? this.pattern.trim() : escapeRegex(this.pattern);
@@ -94,6 +107,7 @@ public class Terminal extends SymbolType {
         this.pattern = terminal.pattern;
         this.isRegex = terminal.isRegex;
         this.command = terminal.command;
+        this.compiledPattern = null;  // invalidate cache on update
     }
 
     /**

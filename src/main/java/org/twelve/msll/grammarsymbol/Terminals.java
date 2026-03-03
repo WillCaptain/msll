@@ -9,7 +9,6 @@ import org.twelve.msll.util.RegexString;
 
 import java.util.*;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Stores all terminal symbols for a specific parser.
@@ -184,9 +183,9 @@ public class Terminals implements SymbolTypes<Terminal> {
             Token bestMatch = null;
             int maxMatchLength = -1;
 
-            // Iterate through all terminals to find the best match
+            // P1: use pre-compiled Pattern cached on Terminal; only Matcher is created here.
             for (Terminal terminal : terminals) {
-                Matcher matcher = Pattern.compile(terminal.regex()).matcher(remainingInput);
+                Matcher matcher = terminal.compiledPattern().matcher(remainingInput);
                 if (matcher.lookingAt()) {
                     String name = terminal.tokenName();
                     String value = matcher.group(name);

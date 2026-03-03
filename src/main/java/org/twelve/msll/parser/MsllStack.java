@@ -175,7 +175,10 @@ public class MsllStack extends Stack<ParseNode> {
         ParseNode popped = super.pop();
         GrammarAmbiguity grammarAmbiguity = null;
         if (!this.isEmpty()) {
-            grammarAmbiguity = this.batches().get(popped);
+            // Hot path: avoid creating a merged HashMap on every pop.
+            // Two direct O(1) lookups replace the previous O(N) map-merge.
+            grammarAmbiguity = this.batches.get(popped);
+            if (grammarAmbiguity == null) grammarAmbiguity = this.parentBatches.get(popped);
         }
         // Only use a non-hidden token as the disambiguation key.
         // Hidden-channel tokens (e.g. SingleLineComment) must never be passed to
