@@ -64,14 +64,18 @@ public class ParserTree {
 
     /**
      * Removes empty non-terminal nodes that were created during parsing but do not hold any child nodes.
+     * Uses reverse index-based iteration over the internal node list to avoid the O(N) defensive-copy
+     * overhead of {@link NonTerminalNode#nodes()}.  Reverse order is safe because removing the child
+     * at index {@code i} only affects indices {@code >= i}; indices {@code < i} are never touched.
      *
      * @param node The current non-terminal node.
      */
     private void clearEmptyNonTerminals(NonTerminalNode node) {
-        if (node.nodes().size() == 0 && node.parent!=null) {
+        if (node.nodeCount() == 0 && node.parent != null) {
             node.parent.removeNode(node);
         } else {
-            for (ParseNode n : node.nodes()) {
+            for (int i = node.nodeCount() - 1; i >= 0; i--) {
+                ParseNode n = node.nodeAt(i);
                 if (n instanceof NonTerminalNode) {
                     clearEmptyNonTerminals(cast(n));
                 }
@@ -82,17 +86,20 @@ public class ParserTree {
     /**
      * Clears nodes that have expired flags, which indicate that the path associated with those nodes failed
      * in the multi-stack parsing process.
+     * Uses reverse index-based iteration to avoid the defensive-copy overhead of
+     * {@link NonTerminalNode#nodes()}.  Removing the child at index {@code i} only shifts indices
+     * {@code >= i}, so the already-visited prefix (indices {@code < i}) is never affected.
      *
      * @param node The current parse node.
      */
     private void clearFlags(ParseNode node) {
-        if (node.flag().expired() && node.parent()!=null) {
+        if (node.flag().expired() && node.parent() != null) {
             node.parent().removeNode(node);
-        } else {
-            if (node instanceof NonTerminalNode)
-                for (ParseNode child : ((NonTerminalNode) node).nodes()) {
-                    clearFlags(child);
-                }
+        } else if (node instanceof NonTerminalNode) {
+            NonTerminalNode ntNode = (NonTerminalNode) node;
+            for (int i = ntNode.nodeCount() - 1; i >= 0; i--) {
+                clearFlags(ntNode.nodeAt(i));
+            }
         }
     }
 

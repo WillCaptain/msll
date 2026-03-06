@@ -16,7 +16,9 @@ public abstract class ParseNode<T extends SymbolType> {
     protected NonTerminalNode parent;
     private final long id;
 
-    private Map<String,Object> tag = new HashMap<>();
+    // Lazily initialised: most ParseNodes never have tags set, so avoid allocating
+    // a HashMap per node (which causes significant GC pressure when parsing large inputs).
+    private Map<String,Object> tag = null;
 
     public ParseNode(Symbol<T> symbol){
         this.symbol = symbol;
@@ -66,9 +68,11 @@ public abstract class ParseNode<T extends SymbolType> {
     }
 
     public void setTag(String key, Object value) {
-        this.tag.put(key,value);
+        if (tag == null) tag = new HashMap<>();
+        this.tag.put(key, value);
     }
     public Object getTag(String key){
+        if (tag == null) return null;
         return this.tag.get(key);
     }
 

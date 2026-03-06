@@ -177,6 +177,24 @@ public class NonTerminalNode extends ParseNode<NonTerminal> {
         return this.nodes.indexOf(node);
     }
 
+    /**
+     * Returns the number of direct child nodes without creating a copy.
+     * Intended for use in index-based traversal patterns where callers guarantee
+     * they will not structurally modify <em>this</em> node's list while iterating.
+     */
+    public int nodeCount() {
+        return this.nodes.size();
+    }
+
+    /**
+     * Returns the child node at the given index directly from the internal list.
+     * Intended for use in index-based traversal patterns (e.g. reverse iteration
+     * in the polish step) where a defensive copy is not required.
+     */
+    public ParseNode nodeAt(int index) {
+        return this.nodes.get(index);
+    }
+
     @Override
     public String toString() {
         if (this.nodes.size() == 0) return this.symbol.name();

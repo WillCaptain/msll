@@ -1,1 +1,4 @@
+org/twelve/msll/RegexLexerTest.class
+org/twelve/msll/MyGrammarTest.class
 org/twelve/msll/StackDebugTest.class
+org/twelve/msll/CfgGrammarTest.class

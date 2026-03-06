@@ -23,6 +23,13 @@ import java.util.regex.Matcher;
  */
 public class Terminals implements SymbolTypes<Terminal> {
     protected final List<Terminal> terminals = new ArrayList<>();
+
+    /**
+     * Flat array of [WHITESPACE, ...this.terminals] cached for the match() hot path.
+     * Re-built lazily whenever terminals change.  Avoids O(N_lines) ArrayList creation
+     * and copy overhead inside match().
+     */
+    private Terminal[] cachedTerminalArray = null;
     public final Terminal END;
     public final Terminal EOL;
     public final Terminal OR_OR;
@@ -171,9 +178,17 @@ public class Terminals implements SymbolTypes<Terminal> {
      * @throws LexerException if an unexpected character is found.
      */
     public List<Token> match(String line, int lineNum, int charIndex) throws LexerException {
-        List<Terminal> terminals = new ArrayList<>();
-        terminals.add(Terminal.WHITESPACE);
-        terminals.addAll(this.terminals);
+        // P2: use a per-Terminals cached flat array instead of building a new ArrayList per call.
+        // During parsing the terminal set is frozen, so the cache is always valid here.
+        Terminal[] allTerminals = this.cachedTerminalArray;
+        if (allTerminals == null) {
+            allTerminals = new Terminal[this.terminals.size() + 1];
+            allTerminals[0] = Terminal.WHITESPACE;
+            for (int i = 0; i < this.terminals.size(); i++) {
+                allTerminals[i + 1] = this.terminals.get(i);
+            }
+            this.cachedTerminalArray = allTerminals;
+        }
         List<Token> tokens = new ArrayList<>();
         int position = 0;
         int length = line.length();
@@ -184,7 +199,7 @@ public class Terminals implements SymbolTypes<Terminal> {
             int maxMatchLength = -1;
 
             // P1: use pre-compiled Pattern cached on Terminal; only Matcher is created here.
-            for (Terminal terminal : terminals) {
+            for (Terminal terminal : allTerminals) {
                 Matcher matcher = terminal.compiledPattern().matcher(remainingInput);
                 if (matcher.lookingAt()) {
                     String name = terminal.tokenName();
@@ -262,18 +277,21 @@ public class Terminals implements SymbolTypes<Terminal> {
             this.terminals.removeIf(t -> t.pattern().equals(symbolType.pattern()));
             this.terminals.add(old);
         }
+        this.cachedTerminalArray = null;
         return old;
     }
 
     public Terminal addTerminal(String name, String pattern) {
         Terminal terminal = new Terminal(name, pattern);
         this.terminals.add(terminal);
+        this.cachedTerminalArray = null;
         return terminal;
     }
 
     public Terminal addTerminal(String name, RegexString rStr) {
         Terminal terminal = new Terminal(name, rStr);
         this.terminals.add(terminal);
+        this.cachedTerminalArray = null;
         return terminal;
     }
 
@@ -291,6 +309,7 @@ public class Terminals implements SymbolTypes<Terminal> {
         if (old == null) {
             old = symbolType;
             this.terminals.add(0, symbolType);
+            this.cachedTerminalArray = null;
         }
         return old;
     }
