@@ -7,6 +7,7 @@ import org.twelve.msll.parsetree.ParseNode;
 import org.twelve.msll.util.GrammarAmbiguity;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -23,9 +24,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class MsllStack extends Stack<ParseNode> {
     /**
-     * A list to keep track of all active and available MSLL stacks
+     * Pool of freed (unoccupied) stacks available for reuse.
+     * Using an ArrayDeque gives O(1) offer/poll vs the previous O(N) linear scan
+     * over the old `all` list.  The pool is cleared by reset() after each parse.
      */
-    private static List<MsllStack> all = new ArrayList<>();
+    // ConcurrentLinkedDeque is fully thread-safe for poll()/offer()/clear(), which
+    // prevents ConcurrentModificationException when two parse() calls run simultaneously
+    // on different threads (e.g. editor typecheck racing with an LLM tool call).
+    private static final ConcurrentLinkedDeque<MsllStack> freePool = new ConcurrentLinkedDeque<>();
 
     /**
      * Atomic counter to assign a unique index to each new stack
@@ -59,10 +65,8 @@ public class MsllStack extends Stack<ParseNode> {
      * @return The applied `MsllStack`.
      */
     public static MsllStack apply(MsllStack parent, GrammarAmbiguity grammarAmbiguity, String grammarName) {
-        Optional<MsllStack> stack = all.stream().filter(s -> !s.occupied).findFirst();
-        MsllStack s;
-        if (stack.isPresent()) {
-            s = stack.get();
+        MsllStack s = freePool.poll();  // O(1) reuse
+        if (s != null) {
             s.addBatch(grammarAmbiguity);
         } else {
             s = new MsllStack(grammarAmbiguity, grammarName);
@@ -75,6 +79,8 @@ public class MsllStack extends Stack<ParseNode> {
             s.parentBatches = parent.batches();
         } else {
             s.flag = new Flag(null);
+            // Reset parentBatches so stale entries from previous use never pollute a fresh stack.
+            if (!s.parentBatches.isEmpty()) s.parentBatches = new HashMap<>();
         }
         return s;
     }
@@ -85,12 +91,11 @@ public class MsllStack extends Stack<ParseNode> {
     }
 
     /**
-     * Private constructor that assigns a unique index to the stack and adds it to the list of all stacks.
+     * Private constructor that assigns a unique index to the new stack.
      */
     private MsllStack(GrammarAmbiguity grammarAmbiguity, String grammarName) {
         this.id = counter.incrementAndGet();
         this.grammarName = grammarName;
-        all.add(this);
         this.addBatch(grammarAmbiguity);
     }
 
@@ -100,25 +105,26 @@ public class MsllStack extends Stack<ParseNode> {
     }
 
     /**
-     * Resets the stack system by clearing all existing stacks.
-     * <p>
-     * This method clears all active and available stacks, typically used to reset the parsing system
-     * before starting a new parsing operation.
+     * Resets the stack system by draining the free pool.
+     * Called after each completed parse to prevent stale stacks from leaking
+     * across parse invocations.
      */
     public static void reset() {
-        all.clear();
+        freePool.clear();
     }
 
     /**
-     * Frees the stack by marking it as unoccupied and clearing its contents.
-     * <p>
-     * This method is called when a stack is no longer needed in the parsing process, making it
-     * available for reuse in future parsing operations.
+     * Frees the stack by clearing its contents and returning it to the free pool for reuse.
+     * The {@code occupied} guard prevents a double-add when expire() or free() is called more
+     * than once on the same stack instance (a scenario that can arise from the panic-mode
+     * catch block in MsllParser.parseToken).
      */
     public void free() {
+        if (!this.occupied) return;  // guard: already freed, do not re-add to pool
         this.occupied = false;
         this.clear();
         this.batches.clear();
+        freePool.offer(this);
     }
 
     /**

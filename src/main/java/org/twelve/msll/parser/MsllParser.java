@@ -490,7 +490,6 @@ public abstract class MsllParser<P extends ParserTree> {
             if (cause instanceof GrammarSyntaxException gse) {
                 throw gse;
             }
-            e.printStackTrace();
             throw new GrammarSyntaxException("parsing error: " + e.getMessage());
         }
         return this.done();
