@@ -34,7 +34,7 @@ public class LexerRuleParserBuilder extends ParserBuilder<CfgGrammarBuilder, Lex
      */
     public LexerRuleParserBuilder() {
         super(new CfgGrammarBuilder(new String[]{
-                "lexer->comments' lexer_head' comments' channel_options' grammars",
+                "lexer->comments' lexer_head' comments' channel_options' lex_sections'",
                 "comments'->ε|line_comment' comments'",
                 "line_comment'->LONG_COMMENT|COMMENT",
                 "lexer_head'->ε|lexer_head",
@@ -47,23 +47,32 @@ public class LexerRuleParserBuilder extends ParserBuilder<CfgGrammarBuilder, Lex
                 "option->id' EQUAL id';",
                 "channel'->ε|channel_statement",
                 "channel_statement->CHANNELS LEFT_BRACE id' ids' RIGHT_BRACE",
-                "ids'->ε| COMMA id' ids'",
-                "grammars->grammar' more_grammar'",
-                "more_grammar'->ε|grammar' more_grammar'",
-                "grammar' -> grammar | line_comment'",
-                "grammar->terminal tail_comment' : productions lexer_command';",
+                "ids'->ε|COMMA id' ids'",
+                // Sections: regular rules, fragment rules, mode declarations
+                "lex_sections'->ε|lex_section' lex_sections'",
+                "lex_section'->grammar|fragment_grammar|mode_decl|line_comment'",
+                "mode_decl->MODE UPPER_ID;",
+                // Regular lexer rule: NAME : body command? ;
+                "grammar->terminal tail_comment' : lex_body lexer_command' ;",
+                // Fragment rule: fragment NAME : body ;  (no lexer command)
+                "fragment_grammar->FRAGMENT terminal tail_comment' : lex_body ;",
                 "lexer_command'->ε|LEXER_COMMAND",
                 "tail_comment'->ε|COMMENT tail_comment'",
                 "terminal->UPPER_ID",
-                "productions->production more_productions'",
-                "more_productions'-> ε| production' more_productions'",
-                "production'->COMMENT | OR production",
-                "production-> associate symbol more_production'",
-                "associate->ε|LESS ASSOC EQUAL direct' GREATER",
-                "direct'->NONE | LEFT | RIGHT",
-                "more_production'-> ε | EXPLAIN | production",
-                "symbol-> STRING|REGEX|COMMENT|PREDICATE|terminal",
-
+                // Lexer rule body: alternatives separated by |
+                "lex_body->lex_alt lex_more_alts'",
+                "lex_more_alts'->ε|OR lex_alt lex_more_alts'",
+                // Single alternative: a sequence of elements
+                "lex_alt->lex_elem lex_more_elems'",
+                "lex_more_elems'->ε|lex_elem lex_more_elems'",
+                // Element: atom with optional quantifier (greedy or lazy: *? +?)
+                "lex_elem->lex_atom lex_quantifier'",
+                "lex_quantifier'->ε|STAR lazy_q'|PLUS lazy_q'|QUESTION",
+                "lazy_q'->ε|QUESTION",
+                // Atom: terminal chars, char classes, regex, groups, negation, fragment refs
+                "lex_atom->STRING|SINGLE_CHARACTER|ANY|SPECIAL|REGEX|PREDICATE|terminal|lex_group|lex_not",
+                "lex_group->LEFT_PAREN lex_body RIGHT_PAREN",
+                "lex_not->NOT lex_atom",
         }, NonTerminals.lexer(), Terminals.lexer()));
     }
 

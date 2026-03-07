@@ -33,6 +33,14 @@ public class Terminal extends SymbolType {
     private volatile Pattern compiledPattern = null;
 
     /**
+     * The lexer mode this terminal belongs to.
+     * null = built-in / always active (regardless of mode).
+     * "DEFAULT_MODE" = active only in the default lexer mode.
+     * Any other value = active only in the named mode.
+     */
+    private String mode = null;
+
+    /**
      * Constructor for a terminal with a literal match pattern.
      *
      * @param name    The name of the terminal.
@@ -107,6 +115,7 @@ public class Terminal extends SymbolType {
         this.pattern = terminal.pattern;
         this.isRegex = terminal.isRegex;
         this.command = terminal.command;
+        this.mode = terminal.mode;
         this.compiledPattern = null;  // invalidate cache on update
     }
 
@@ -146,5 +155,15 @@ public class Terminal extends SymbolType {
      */
     public String getCommand() {
         return this.command;
+    }
+
+    /** Returns the lexer mode this terminal belongs to (null = always active). */
+    public String mode() {
+        return this.mode;
+    }
+
+    /** Assigns this terminal to a specific lexer mode. */
+    public void setMode(String mode) {
+        this.mode = mode;
     }
 }

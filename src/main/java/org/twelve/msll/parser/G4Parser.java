@@ -106,7 +106,9 @@ public abstract class G4Parser<P extends ParserTree> extends MsllParser<P> {
                     || node.name().equals(Constants.PRODUCTIONS)
                     || node.name().equals(Constants.PRODUCTION)
                     || node.name().equals(Constants.NON_TERMINAL)
-                    || node.name().equals(Constants.TERMINAL)) return;
+                    || node.name().equals(Constants.TERMINAL)
+                    || node.name().equals(Constants.LEX_BODY)
+                    || node.name().equals(Constants.LEX_ALT)) return;
             int index = parent.removeNode(node);
             parent.addNodes(node.nodes(), index);
         }
@@ -144,7 +146,15 @@ public abstract class G4Parser<P extends ParserTree> extends MsllParser<P> {
         }
 
         if (node.name().equals(Constants.STRING)) {
-            node.setToken(new Token(token.terminal(), token.lexeme().replaceAll("[\"']", ""), token.location()));
+            String s = token.lexeme();
+            // Strip only the outermost quote pair to preserve embedded quotes (e.g. '"' → ")
+            if (s.length() >= 2) {
+                char first = s.charAt(0), last = s.charAt(s.length() - 1);
+                if ((first == '\'' && last == '\'') || (first == '"' && last == '"')) {
+                    s = s.substring(1, s.length() - 1);
+                }
+            }
+            node.setToken(new Token(token.terminal(), s, token.location()));
         }
 
         if (node.name().equals("OR")) {

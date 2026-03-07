@@ -25,11 +25,20 @@ public class LexerCommands {
     private static Map<String,LexerCommand> commands = new HashMap<>();
 
     static{
-        // Adding the "channel" command to the command registry
+        // channel(NAME) – route token to the named channel (e.g., HIDDEN, ERROR)
         addCommand("channel", (args, token) -> {
             String channel = args.get(0);
             token.setChannel(channel);
         });
+        // skip – equivalent to channel(HIDDEN); the token is produced but ignored by the parser
+        addCommand("skip", (args, token) -> token.setChannel("HIDDEN"));
+        // type(X) – re-label the token type; stored as a channel annotation for now
+        addCommand("type", (args, token) -> {
+            if (!args.isEmpty()) token.setChannel("type:" + args.get(0));
+        });
+        // pushMode / popMode – lexer mode transitions (no-op in the stateless RegexLexer)
+        addCommand("pushMode", (args, token) -> {});
+        addCommand("popMode",  (args, token) -> {});
     }
 
     /**

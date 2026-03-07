@@ -19,7 +19,7 @@ import java.io.Serializable;
 public class Token implements Serializable {
     private static final long serialVersionUID = 4293840596528932667L;
 
-    private final Terminal terminal;
+    private Terminal terminal;
 
     private final String lexeme;
 
@@ -66,6 +66,14 @@ public class Token implements Serializable {
         } else {
             return this.lexeme();
         }
+    }
+
+    /**
+     * Relabels this token's terminal type (used by the {@code -> type(X)} lexer command).
+     * The lexeme remains unchanged; only the terminal association is replaced.
+     */
+    public void relabelAs(Terminal newTerminal) {
+        this.terminal = newTerminal;
     }
 
     public void setChannel(String channel) {

@@ -3,6 +3,8 @@ package org.twelve.msll.parsetree;
 import org.twelve.msll.util.Constants;
 
 import java.util.*;
+import java.util.AbstractMap.SimpleEntry;
+import java.util.stream.Collectors;
 
 import static org.twelve.msll.util.Tool.cast;
 
@@ -76,5 +78,81 @@ public class LexerRuleTree extends G4GrammarTree {
     public String name() {
         Optional<NonTerminalNode> head = this.head();
         return head.isPresent() ? head.get().node(1).toString() : "customized language lexer";
+    }
+
+    /**
+     * Override grammarRoot() since the new lexer grammar has no dedicated 'grammars' container node.
+     * Returns start() as a safe fallback (the root argument in optimizeNodes is unused).
+     */
+    @Override
+    public NonTerminalNode grammarRoot() {
+        return this.start();
+    }
+
+    /**
+     * Returns all regular (non-fragment) lexer rule nodes flattened from the parse tree.
+     * After polishing, ignored nodes (ending with ') are flattened so grammar nodes become
+     * direct children of start().
+     */
+    public List<NonTerminalNode> allGrammars() {
+        return this.start().nodes().stream()
+                .filter(n -> n instanceof NonTerminalNode
+                        && n.symbol().type().name().equals(Constants.GRAMMAR))
+                .map(n -> (NonTerminalNode) n)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns all fragment rule nodes flattened from the parse tree.
+     */
+    public List<NonTerminalNode> allFragments() {
+        return this.start().nodes().stream()
+                .filter(n -> n instanceof NonTerminalNode
+                        && n.symbol().type().name().equals(Constants.FRAGMENT_GRAMMAR))
+                .map(n -> (NonTerminalNode) n)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns all mode declaration nodes (mode NAME ;) from the parse tree.
+     */
+    public List<NonTerminalNode> allModes() {
+        return this.start().nodes().stream()
+                .filter(n -> n instanceof NonTerminalNode
+                        && n.symbol().type().name().equals(Constants.MODE_DECL))
+                .map(n -> (NonTerminalNode) n)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns all regular lexer rule nodes paired with the mode they belong to.
+     * Nodes before the first {@code mode} declaration belong to {@code "DEFAULT_MODE"}.
+     * Rules after a {@code mode X;} declaration belong to mode {@code "X"}.
+     *
+     * <p>The list preserves source order, which matters for terminal priority.
+     */
+    public List<SimpleEntry<String, NonTerminalNode>> allGrammarsWithModes() {
+        List<SimpleEntry<String, NonTerminalNode>> result = new ArrayList<>();
+        String currentMode = "DEFAULT_MODE";
+        for (ParseNode node : this.start().nodes()) {
+            if (!(node instanceof NonTerminalNode)) continue;
+            NonTerminalNode nonTermNode = (NonTerminalNode) node;
+            String typeName = node.symbol().type().name();
+            if (typeName.equals(Constants.MODE_DECL)) {
+                // mode_decl -> MODE UPPER_ID SEMICOLON
+                // The UPPER_ID terminal node carries the mode name
+                for (ParseNode child : nonTermNode.nodes()) {
+                    if (child instanceof TerminalNode
+                            && child.symbol().type().name().equals(Constants.UPPER_ID)) {
+                        currentMode = child.toString().trim();
+                        break;
+                    }
+                }
+            } else if (typeName.equals(Constants.GRAMMAR)) {
+                result.add(new SimpleEntry<>(currentMode, nonTermNode));
+            }
+            // fragment_grammar is mode-agnostic (fragments are global)
+        }
+        return result;
     }
 }

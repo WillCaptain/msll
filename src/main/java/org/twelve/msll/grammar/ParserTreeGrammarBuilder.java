@@ -7,8 +7,7 @@ import org.twelve.msll.util.Constants;
 import org.twelve.msll.util.RegexString;
 import org.twelve.msll.util.Tool;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -57,17 +56,93 @@ public class ParserTreeGrammarBuilder extends GrammarBuilder {
     }
 
     /**
-     * Constructs terminal symbols from the lexer parse tree.
-     * <p>
-     * This method processes the lexer tree to extract terminal symbols and create corresponding
-     * terminal entries in the grammar. For each terminal, it checks for an optional lexer command and
-     * assigns it to the terminal.
+     * Constructs terminal symbols from the lexer parse tree using the new lex_body-based structure.
+     *
+     * <p>Two passes are performed:
+     * <ol>
+     *   <li>Fragment rules – compiled to Java regex strings and stored in a local map for inlining.</li>
+     *   <li>Regular rules  – compiled to Java regex (with fragment references resolved) and registered
+     *       as {@link Terminal} instances.</li>
+     * </ol>
      */
     private void buildTerminals() {
-        buildGrammarSymbols(this.lexerTree, (nodes, head, productions, i) -> {
-            TerminalNode lexerCommand = nodes.get(3).symbol().name().equals(Constants.LEXER_COMMAND) ? cast(nodes.get(3)) : null;
-            createTerminal(head.nodes().get(0).toString(), cast(productions.nodes().get(0)), lexerCommand);
-        });
+        LexerRuleTree lexerRuleTree = (LexerRuleTree) this.lexerTree;
+        // Ordered map so earlier fragments can be referenced by later ones
+        Map<String, String> fragmentRegexes = new LinkedHashMap<>();
+
+        // Pass 1: compile fragment rules
+        for (NonTerminalNode fragGrammar : lexerRuleTree.allFragments()) {
+            NonTerminalNode terminalNode = findChild(fragGrammar, Constants.TERMINAL);
+            NonTerminalNode lexBody     = findChild(fragGrammar, Constants.LEX_BODY);
+            if (terminalNode == null || lexBody == null) continue;
+
+            String fragName  = terminalNode.nodes().get(0).toString();
+            String fragRegex = LexerRuleCompiler.compile(lexBody, fragmentRegexes);
+            fragmentRegexes.put(fragName, fragRegex);
+        }
+
+        // Pass 2: compile regular terminals, tracking lexer mode per rule
+        for (Map.Entry<String, NonTerminalNode> entry : lexerRuleTree.allGrammarsWithModes()) {
+            String mode = entry.getKey();
+            NonTerminalNode grammar = entry.getValue();
+
+            NonTerminalNode terminalNode = findChild(grammar, Constants.TERMINAL);
+            NonTerminalNode lexBody      = findChild(grammar, Constants.LEX_BODY);
+            if (terminalNode == null || lexBody == null) continue;
+
+            String name = terminalNode.nodes().get(0).toString();
+            if (name.contains("'")) continue; // msll internal helper rule convention
+
+            TerminalNode lexerCommandNode = findTerminalChild(grammar, Constants.LEXER_COMMAND);
+
+            String regex = LexerRuleCompiler.compile(lexBody, fragmentRegexes);
+            // Pattern.quote("x") produces \Qx\E.  For plain keyword terminals we
+            // must store the literal pattern (without \Q/\E) so that
+            // Terminals.fromPattern("return") can still find the "Return" terminal.
+            Terminal terminal = isLiteralQuote(regex)
+                    ? new Terminal(name, regex.substring(2, regex.length() - 2))
+                    : new Terminal(name, new RegexString(regex));
+            terminal.setCommand(lexerCommandNode == null ? null : lexerCommandNode.toString());
+            terminal.setMode(mode);
+            this.terminals.addSymbol(terminal);
+        }
+
+        // Built-in: EOF is the G4 name for end-of-file (internally END).
+        // Register it so parser rules like `program : stmt* EOF ;` resolve correctly.
+        Terminal eofAlias = new Terminal("EOF", new RegexString(Constants.END));
+        this.terminals.addIfAbsent(eofAlias);
+    }
+
+    /**
+     * Returns true when the regex was produced by Pattern.quote() for a simple string,
+     * i.e. it is exactly \Q<content>\E with no nested \Q or \E inside.
+     */
+    private static boolean isLiteralQuote(String regex) {
+        if (!regex.startsWith("\\Q") || !regex.endsWith("\\E")) return false;
+        String inner = regex.substring(2, regex.length() - 2);
+        return !inner.contains("\\E");  // nested \E would break the literal assumption
+    }
+
+    /** Finds the first NonTerminalNode child with the given type name. */
+    private static NonTerminalNode findChild(NonTerminalNode parent, String typeName) {
+        for (ParseNode child : parent.nodes()) {
+            if (child instanceof NonTerminalNode
+                    && child.symbol().type().name().equals(typeName)) {
+                return cast(child);
+            }
+        }
+        return null;
+    }
+
+    /** Finds the first TerminalNode child with the given type name. */
+    private static TerminalNode findTerminalChild(NonTerminalNode parent, String typeName) {
+        for (ParseNode child : parent.nodes()) {
+            if (child instanceof TerminalNode
+                    && child.symbol().type().name().equals(typeName)) {
+                return cast(child);
+            }
+        }
+        return null;
     }
 
     /**
@@ -110,30 +185,6 @@ public class ParserTreeGrammarBuilder extends GrammarBuilder {
         }
     }
 
-    /**
-     * Creates a terminal symbol and adds it to the terminals set.
-     * <p>
-     * This method creates a terminal from the given name and production value. It supports different types
-     * of terminal symbols, such as regex-based terminals. An optional lexer command can also be associated
-     * with the terminal.
-     *
-     * @param name         The name of the terminal symbol.
-     * @param value        The value or pattern representing the terminal.
-     * @param lexerCommand The optional lexer command associated with the terminal.
-     */
-    private void createTerminal(String name, NonTerminalNode value, TerminalNode lexerCommand) {
-        Terminal terminal;
-        if (name.contains("'")) return;
-        switch (value.nodes().get(0).symbol().name()) {
-            case Constants.REGEX:
-                terminal = new Terminal(name, new RegexString(value.toString()));//.token().lexeme()
-                break;
-            default:
-                terminal = new Terminal(name, value.lexeme());
-        }
-        terminal.setCommand(lexerCommand == null ? null : lexerCommand.toString());
-        this.terminals.addSymbol(terminal);
-    }
 
     /**
      * Creates a non-terminal symbol and its associated productions, then adds them to the grammar.

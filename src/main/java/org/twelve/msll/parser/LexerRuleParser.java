@@ -43,7 +43,9 @@ public class LexerRuleParser extends G4Parser<LexerRuleTree> {
     @Override
     protected LexerRuleTree done() {
         LexerRuleTree tree = super.done();
-        this.optimizeNodes(tree.start(), cast(tree.grammarRoot()));
+        // Pass start() as the root; the second arg is used only as a reference point
+        // in mergeProduction/cutOneChildNode which don't actually use it.
+        this.optimizeNodes(tree.start(), tree.start());
         return tree;
     }
 

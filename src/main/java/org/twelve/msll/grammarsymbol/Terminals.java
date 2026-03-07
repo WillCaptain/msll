@@ -3,6 +3,7 @@ package org.twelve.msll.grammarsymbol;
 import org.twelve.msll.exception.LexerException;
 import org.twelve.msll.lexer.Line;
 import org.twelve.msll.lexer.Location;
+import org.twelve.msll.lexer.MatchResult;
 import org.twelve.msll.lexer.Token;
 import org.twelve.msll.util.Constants;
 import org.twelve.msll.util.RegexString;
@@ -30,6 +31,12 @@ public class Terminals implements SymbolTypes<Terminal> {
      * and copy overhead inside match().
      */
     private Terminal[] cachedTerminalArray = null;
+
+    /**
+     * Per-mode cached terminal arrays.  Built lazily on first access for each mode name.
+     * Cleared whenever terminals change (same lifecycle as cachedTerminalArray).
+     */
+    private final Map<String, Terminal[]> modeTerminalCache = new HashMap<>();
     public final Terminal END;
     public final Terminal EOL;
     public final Terminal OR_OR;
@@ -111,7 +118,8 @@ public class Terminals implements SymbolTypes<Terminal> {
         if (parserTerminals == null) {
             parserTerminals = new Terminals();
             parserTerminals.addTerminal(Constants.PARSER_GRAMMAR, new RegexString("^parser\\s+grammar\\b"));
-            parserTerminals.addTerminal(Constants.STRING, new RegexString("(?<quote>['\"])[^\"']*\\k<quote>"));
+            // Allow the opposite-quote type inside: 'can contain "' and "can contain '"
+            parserTerminals.addTerminal(Constants.STRING, new RegexString("'[^']*'|\"[^\"]*\""));
 
             fillTerminals(parserTerminals);
             parserTerminals.addTerminal(Constants.ID, new RegexString("([a-z_][\\w,']*)"));
@@ -126,13 +134,16 @@ public class Terminals implements SymbolTypes<Terminal> {
     public synchronized static Terminals lexer() {
         if (lexerTerminals == null) {
             lexerTerminals = new Terminals();
-            lexerTerminals.addTerminal(Constants.STRING, new RegexString("(?<quote>['\"])[^\"']*\\k<quote>"));
+            // Allow the opposite-quote type inside: 'can contain "' and "can contain '"
+            lexerTerminals.addTerminal(Constants.STRING, new RegexString("'[^']*'|\"[^\"]*\""));
             lexerTerminals.addTerminal(Constants.LEXER_GRAMMAR, new RegexString("^lexer\\s+grammar\\b"));
             lexerTerminals.addTerminal(Constants.ANY, Constants.DOT);
             lexerTerminals.addTerminal(Constants.SPECIAL, new RegexString("\\\\(d|D|b|B|S|s|W|w|\\*|\\?|\\+|\\||\\\\)"));
             lexerTerminals.addTerminal(Constants.LEFT_BRACKET_STR, Constants.LEFT_BRACKET);
             lexerTerminals.addTerminal(Constants.RIGHT_BRACKET_STR, Constants.RIGHT_BRACKET);
             lexerTerminals.addTerminal(Constants.SINGLE_CHARACTER, new RegexString("\\[\\^?(?:\\\\.|[^\\]])+\\]"));
+            // NOT (~) operator for negated char classes: ~[...] or ~'x'
+            lexerTerminals.addTerminal(Constants.NOT_STR, Constants.NOT);
 
             fillTerminals(lexerTerminals);
             lexerTerminals.addTerminal(Constants.ID, new RegexString("([a-z][A-Za-z0-9_]*)"));
@@ -147,7 +158,10 @@ public class Terminals implements SymbolTypes<Terminal> {
     private static void fillTerminals(Terminals terminals) {
         terminals.addTerminal(Constants.REGEX, new RegexString("/\\\".+\\\"/"));
         terminals.addTerminal(Constants.FRAGMENT.toUpperCase(), Constants.FRAGMENT);
-        terminals.addTerminal(Constants.PREDICATE, new RegexString("\\{[a-zA-Z0-9_.()\"]*\\}"));
+        terminals.addTerminal(Constants.MODE_STR, Constants.MODE);
+        // PREDICATE matches {action code} or {predicate}? bodies.
+        // Excludes commas (channels/options separators) and newlines (multi-line blocks).
+        terminals.addTerminal(Constants.PREDICATE, new RegexString("\\{[^},\\n\\r]*\\}"));
         terminals.addTerminal(Constants.EXPLAIN, new RegexString("#\\s*[\\w,\\s]*"));
         terminals.addTerminal(Constants.PLUS_STR, Constants.PLUS);
         terminals.addTerminal(Constants.LEFT.toUpperCase(), Constants.LEFT);
@@ -278,6 +292,7 @@ public class Terminals implements SymbolTypes<Terminal> {
             this.terminals.add(old);
         }
         this.cachedTerminalArray = null;
+        this.modeTerminalCache.clear();
         return old;
     }
 
@@ -285,6 +300,7 @@ public class Terminals implements SymbolTypes<Terminal> {
         Terminal terminal = new Terminal(name, pattern);
         this.terminals.add(terminal);
         this.cachedTerminalArray = null;
+        this.modeTerminalCache.clear();
         return terminal;
     }
 
@@ -292,6 +308,7 @@ public class Terminals implements SymbolTypes<Terminal> {
         Terminal terminal = new Terminal(name, rStr);
         this.terminals.add(terminal);
         this.cachedTerminalArray = null;
+        this.modeTerminalCache.clear();
         return terminal;
     }
 
@@ -310,7 +327,102 @@ public class Terminals implements SymbolTypes<Terminal> {
             old = symbolType;
             this.terminals.add(0, symbolType);
             this.cachedTerminalArray = null;
+            this.modeTerminalCache.clear();
         }
         return old;
+    }
+
+    // -----------------------------------------------------------------------
+    // Mode-aware matching
+    // -----------------------------------------------------------------------
+
+    /**
+     * Returns the terminal array to use for the given mode.
+     *
+     * <ul>
+     *   <li>If no terminal has an explicit mode set (plain grammar files without mode
+     *       sections), all terminals are returned — backward-compatible behaviour.</li>
+     *   <li>Otherwise only terminals belonging to {@code mode} (or with {@code mode==null},
+     *       i.e. built-ins) are returned.</li>
+     * </ul>
+     */
+    private Terminal[] getActiveTerminalsFor(String mode) {
+        boolean hasModeSpecific = this.terminals.stream()
+                .anyMatch(t -> t.mode() != null && !t.mode().equals("DEFAULT_MODE"));
+        if (!hasModeSpecific) {
+            // No mode sections → use the global cached array (backward compat)
+            if (this.cachedTerminalArray == null) {
+                Terminal[] arr = new Terminal[this.terminals.size() + 1];
+                arr[0] = Terminal.WHITESPACE;
+                for (int i = 0; i < this.terminals.size(); i++) arr[i + 1] = this.terminals.get(i);
+                this.cachedTerminalArray = arr;
+            }
+            return this.cachedTerminalArray;
+        }
+        String key = mode == null ? "DEFAULT_MODE" : mode;
+        return modeTerminalCache.computeIfAbsent(key, m -> {
+            List<Terminal> active = new ArrayList<>();
+            active.add(Terminal.WHITESPACE);
+            for (Terminal t : this.terminals) {
+                // null mode = always active (built-in); matching mode = active
+                if (t.mode() == null || t.mode().equals(m)) {
+                    active.add(t);
+                }
+            }
+            return active.toArray(new Terminal[0]);
+        });
+    }
+
+    /**
+     * Matches the <em>next single token</em> starting at the beginning of {@code remaining}.
+     *
+     * <p>This is the building block used by {@link RegexLexer} for token-by-token, mode-aware
+     * scanning.  The caller advances its position by {@link MatchResult#length()} after each call.
+     *
+     * @param remaining      Unscanned portion of the current line (must not be empty).
+     * @param lineNum        1-based line number, forwarded to the created {@link Token}.
+     * @param lineCharIndex  Absolute character index of the <em>start of the line</em> in the
+     *                       source stream (used to build {@link Location}).
+     * @param positionInLine Column offset (0-based) of {@code remaining} within the line.
+     * @param mode           Current lexer mode name, or {@code null} / {@code "DEFAULT_MODE"}.
+     * @return A {@link MatchResult} containing the matched token and its consumed length.
+     * @throws LexerException if no terminal matches at the current position.
+     */
+    public MatchResult matchNext(String remaining, int lineNum, int lineCharIndex,
+                                 int positionInLine, String mode) throws LexerException {
+        Terminal[] activeTerminals = getActiveTerminalsFor(mode);
+        Token bestMatch = null;
+        int maxMatchLength = -1;
+
+        for (Terminal terminal : activeTerminals) {
+            Matcher matcher = terminal.compiledPattern().matcher(remaining);
+            if (matcher.lookingAt()) {
+                String name = terminal.tokenName();
+                String value = matcher.group(name);
+                int matchLength = value.length();
+                if (matchLength > maxMatchLength
+                        || (matchLength == maxMatchLength && !terminal.isRegex())) {
+                    maxMatchLength = matchLength;
+                    bestMatch = new Token(terminal, value, new Location(
+                            matcher.start(name) + positionInLine,
+                            matcher.end(name) + positionInLine,
+                            new Line(lineNum, lineCharIndex)));
+                }
+            }
+        }
+
+        if (bestMatch != null) {
+            return new MatchResult(bestMatch, maxMatchLength);
+        }
+        char badChar = remaining.charAt(0);
+        String pointer = " ".repeat(positionInLine) + "^";
+        throw new LexerException(
+                "Unexpected character '" + badChar + "'"
+                + " at line " + lineNum + ", column " + positionInLine
+                + System.lineSeparator()
+                + "  (mode: " + (mode == null ? "DEFAULT_MODE" : mode) + ")"
+                + System.lineSeparator()
+                + "  " + pointer
+        );
     }
 }

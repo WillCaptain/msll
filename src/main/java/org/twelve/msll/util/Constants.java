@@ -140,8 +140,20 @@ public class Constants {
     public static final String WHITESPACE_STR = "WHITESPACE";
     public static final String FRAGMENT = "fragment";
     public static final String FRAGMENT_TERMINAL = "fragment_terminal";
+    public static final String FRAGMENT_GRAMMAR = "fragment_grammar";
     public static final String ANY = "ANY";
     public static final String CHAR = "CHAR";
     public static final String SPECIAL = "SPECIAL";
     public static final String SINGLE_CHARACTER = "SINGLE_CHARACTER";
+    public static final String NOT = "~";
+    public static final String NOT_STR = "NOT";
+    public static final String MODE = "mode";
+    public static final String MODE_STR = "MODE";
+    public static final String MODE_DECL = "mode_decl";
+    public static final String SKIP = "skip";
+    public static final String LEX_BODY = "lex_body";
+    public static final String LEX_ALT = "lex_alt";
+    public static final String LEX_ELEM = "lex_elem";
+    public static final String LEX_GROUP = "lex_group";
+    public static final String LEX_NOT = "lex_not";
 }
