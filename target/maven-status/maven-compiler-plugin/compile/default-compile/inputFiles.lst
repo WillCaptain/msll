@@ -10,6 +10,7 @@
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/grammar/Grammar.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/grammar/GrammarBuilder.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/grammar/Grammars.java
+/Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/grammar/LexerRuleCompiler.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/grammar/ParserTreeGrammarBuilder.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/grammar/Production.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/grammarsymbol/NonTerminal.java
@@ -24,6 +25,7 @@
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/lexer/LexerCommands.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/lexer/Line.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/lexer/Location.java
+/Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/lexer/MatchResult.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/lexer/RegexLexer.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/lexer/Token.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/lexer/TokenBuffer.java

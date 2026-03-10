@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
-Test set: org.twelve.msll.StackDebugTest
+Test set: org.twelve.msll.G4CompatTest
 -------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 20.10 s -- in org.twelve.msll.StackDebugTest
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.020 s -- in org.twelve.msll.G4CompatTest

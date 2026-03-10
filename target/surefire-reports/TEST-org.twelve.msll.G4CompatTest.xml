@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="org.twelve.msll.MyGrammarTest" time="64.368" tests="11" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="org.twelve.msll.G4CompatTest" time="0.02" tests="5" errors="0" skipped="0" failures="0">
   <properties>
     <property name="socksProxyHost" value="127.0.0.1"/>
     <property name="http.proxyHost" value="127.0.0.1"/>
@@ -64,15 +64,9 @@
     <property name="java.class.version" value="65.0"/>
     <property name="http.proxyPort" value="7890"/>
   </properties>
-  <testcase name="test_flat" classname="org.twelve.msll.MyGrammarTest" time="0.046"/>
-  <testcase name="test_without_line_terminator" classname="org.twelve.msll.MyGrammarTest" time="0.013"/>
-  <testcase name="test_comments_from_grammar" classname="org.twelve.msll.MyGrammarTest" time="0.012"/>
-  <testcase name="test_channel" classname="org.twelve.msll.MyGrammarTest" time="0.011"/>
-  <testcase name="test_with_line_terminator" classname="org.twelve.msll.MyGrammarTest" time="0.011"/>
-  <testcase name="test_comment_with_command" classname="org.twelve.msll.MyGrammarTest" time="0.025"/>
-  <testcase name="test_grammar_name" classname="org.twelve.msll.MyGrammarTest" time="0.013"/>
-  <testcase name="test_deep_layers" classname="org.twelve.msll.MyGrammarTest" time="48.132"/>
-  <testcase name="test" classname="org.twelve.msll.MyGrammarTest" time="0.013"/>
-  <testcase name="test_grammar_options" classname="org.twelve.msll.MyGrammarTest" time="0.01"/>
-  <testcase name="test_multi_layers" classname="org.twelve.msll.MyGrammarTest" time="16.076"/>
+  <testcase name="test_channels_still_parsed" classname="org.twelve.msll.G4CompatTest" time="0.006"/>
+  <testcase name="test_fragment_compiled_to_regex" classname="org.twelve.msll.G4CompatTest" time="0.003"/>
+  <testcase name="test_outline_lexer_still_works" classname="org.twelve.msll.G4CompatTest" time="0.003"/>
+  <testcase name="test_regular_grammar_rules_are_parsed" classname="org.twelve.msll.G4CompatTest" time="0.002"/>
+  <testcase name="test_fragment_rules_are_parsed" classname="org.twelve.msll.G4CompatTest" time="0.003"/>
 </testsuite>

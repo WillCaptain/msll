@@ -17,6 +17,7 @@ org/twelve/msll/grammarsymbol/NonTerminal.class
 org/twelve/msll/exception/LexerException.class
 org/twelve/msll/parser/PredictTable.class
 org/twelve/msll/grammar/Grammar.class
+org/twelve/msll/lexer/MatchResult.class
 org/twelve/msll/lexer/Token.class
 org/twelve/msll/lexer/LexerCommands.class
 org/twelve/msll/parsetree/MyParserTree.class
@@ -41,6 +42,7 @@ org/twelve/msll/grammarsymbol/NonTerminals.class
 org/twelve/msll/grammar/Grammars.class
 org/twelve/msll/grammar/ASSOC.class
 org/twelve/msll/grammar/ParserTreeGrammarBuilder.class
+org/twelve/msll/grammar/LexerRuleCompiler.class
 org/twelve/msll/lexer/RegexLexer.class
 org/twelve/msll/grammar/GrammarBuilder.class
 org/twelve/msll/parsetree/Flag.class
