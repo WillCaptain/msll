@@ -1,0 +1,14 @@
+parser grammar JSONParserSimple;
+
+root
+    : object
+    ;
+
+object
+    : LBRACE RBRACE
+    | LBRACE pair RBRACE
+    ;
+
+pair
+    : STRING COLON STRING
+    ;

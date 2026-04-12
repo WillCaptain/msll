@@ -1,0 +1,9 @@
+parser grammar JSONParserMinimal;
+
+options {
+    tokenVocab = JSONLexer;
+}
+
+root
+    : LBRACE RBRACE
+    ;

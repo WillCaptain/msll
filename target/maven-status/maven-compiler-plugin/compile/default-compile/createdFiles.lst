@@ -51,6 +51,7 @@ org/twelve/msll/util/GrammarAmbiguity.class
 org/twelve/msll/lexer/Line.class
 org/twelve/msll/grammar/Production.class
 org/twelve/msll/grammarsymbol/SymbolTypes.class
+org/twelve/msll/tools/G4ToGMConverter.class
 org/twelve/msll/parser/ParserGrammarParser$TriConsumer.class
 org/twelve/msll/lexer/Lexer.class
 org/twelve/msll/parser/G4Parser.class

@@ -1,0 +1,13 @@
+parser grammar JSONParserV2;
+
+options {
+    tokenVocab = JSONLexerSimple;
+}
+
+root
+    : value
+    ;
+
+value
+    : LBRACE RBRACE
+    ;

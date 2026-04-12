@@ -1,0 +1,17 @@
+parser grammar TestSingleStatement;
+
+options {
+    tokenVocab = JavaScriptLexerSimple;
+}
+
+root
+    : statement
+    ;
+
+statement
+    : block
+    ;
+
+block
+    : LBRACE RBRACE
+    ;

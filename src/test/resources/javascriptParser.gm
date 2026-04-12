@@ -7,8 +7,8 @@ options {
     superClass = JavaScriptParserBase;
 }
 
-program
-    : HashBangLine? sourceElements? EOF
+root
+    : HashBangLine? sourceElements?
     ;
 
 sourceElement
@@ -540,7 +540,6 @@ let_
 
 eos
     : SemiColon
-    | EOF
     | {this.lineTerminatorAhead()}?
     | {this.closeBrace()}?
     ;

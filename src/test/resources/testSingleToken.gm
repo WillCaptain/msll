@@ -1,0 +1,9 @@
+parser grammar TestSingleToken;
+
+options {
+    tokenVocab = JavaScriptLexerSimple;
+}
+
+root
+    : LBRACE
+    ;

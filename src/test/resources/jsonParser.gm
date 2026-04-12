@@ -1,0 +1,33 @@
+parser grammar JSONParser;
+
+options {
+    tokenVocab = JSONLexer;
+}
+
+root
+    : value
+    ;
+
+value
+    : object
+    | array
+    | STRING
+    | NUMBER
+    | TRUE
+    | FALSE
+    | NULL
+    ;
+
+object
+    : LBRACE pair (COMMA pair)* RBRACE
+    | LBRACE RBRACE
+    ;
+
+pair
+    : STRING COLON value
+    ;
+
+array
+    : LBRACK value (COMMA value)* RBRACK
+    | LBRACK RBRACK
+    ;

@@ -1,0 +1,126 @@
+parser grammar PythonParser;
+
+options {
+    tokenVocab = PythonLexer;
+}
+
+file_input
+    : (stmt NEWLINE)* EOF
+    ;
+
+stmt
+    : simple_stmt
+    | compound_stmt
+    ;
+
+simple_stmt
+    : expr_stmt
+    | return_stmt
+    | pass_stmt
+    | break_stmt
+    | continue_stmt
+    ;
+
+expr_stmt
+    : test (ASSIGN test)?
+    ;
+
+return_stmt
+    : RETURN test?
+    ;
+
+pass_stmt
+    : PASS
+    ;
+
+break_stmt
+    : BREAK
+    ;
+
+continue_stmt
+    : CONTINUE
+    ;
+
+compound_stmt
+    : funcdef
+    | if_stmt
+    | while_stmt
+    | for_stmt
+    ;
+
+funcdef
+    : DEF NAME LPAREN parameters? RPAREN COLON suite
+    ;
+
+parameters
+    : NAME (COMMA NAME)*
+    ;
+
+if_stmt
+    : IF test COLON suite (ELIF test COLON suite)* (ELSE COLON suite)?
+    ;
+
+while_stmt
+    : WHILE test COLON suite
+    ;
+
+for_stmt
+    : FOR NAME IN test COLON suite
+    ;
+
+suite
+    : simple_stmt NEWLINE
+    | NEWLINE stmt+
+    ;
+
+test
+    : or_test
+    ;
+
+or_test
+    : and_test
+    ;
+
+and_test
+    : comparison
+    ;
+
+comparison
+    : arith_expr (comp_op arith_expr)*
+    ;
+
+comp_op
+    : LT | GT | EQ | GE | LE | NE
+    ;
+
+arith_expr
+    : term ((PLUS | MINUS) term)*
+    ;
+
+term
+    : factor ((STAR | SLASH | PERCENT) factor)*
+    ;
+
+factor
+    : (PLUS | MINUS)? atom
+    ;
+
+atom
+    : NAME
+    | NUMBER
+    | STRING
+    | TRUE
+    | FALSE
+    | NONE
+    | LPAREN test RPAREN
+    | list_expr
+    | call
+    ;
+
+list_expr
+    : LBRACK (test (COMMA test)*)? RBRACK
+    ;
+
+call
+    : atom LPAREN (test (COMMA test)*)? RPAREN
+    ;

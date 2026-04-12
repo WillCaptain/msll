@@ -54,6 +54,7 @@
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/parsetree/ParserGrammarTree.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/parsetree/ParserTree.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/parsetree/TerminalNode.java
+/Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/tools/G4ToGMConverter.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/util/CommandCall.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/util/Constants.java
 /Users/imac/Documents/code/github/msll/src/main/java/org/twelve/msll/util/GrammarAmbiguity.java

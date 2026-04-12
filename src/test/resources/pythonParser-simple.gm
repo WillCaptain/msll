@@ -1,0 +1,67 @@
+parser grammar PythonParserSimple;
+
+options {
+    tokenVocab = PythonLexerSimple;
+}
+
+// Root rule
+root
+    : statement+
+    ;
+
+statement
+    : expr_stmt
+    | return_stmt
+    | pass_stmt
+    ;
+
+expr_stmt
+    : NAME (ASSIGN test)?
+    ;
+
+return_stmt
+    : RETURN test?
+    ;
+
+pass_stmt
+    : PASS
+    ;
+
+test
+    : comparison
+    ;
+
+comparison
+    : arith_expr (comp_op arith_expr)*
+    ;
+
+comp_op
+    : LT | GT | EQ | GE | LE | NE
+    ;
+
+arith_expr
+    : term ((PLUS | MINUS) term)*
+    ;
+
+term
+    : factor ((STAR | SLASH | PERCENT) factor)*
+    ;
+
+factor
+    : (PLUS | MINUS)? atom
+    ;
+
+atom
+    : NAME
+    | NUMBER
+    | STRING
+    | TRUE
+    | FALSE
+    | NONE
+    | LPAREN test RPAREN
+    | call
+    ;
+
+call
+    : NAME LPAREN (test (COMMA test)*)? RPAREN
+    ;

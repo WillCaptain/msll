@@ -1,0 +1,23 @@
+lexer grammar JSONLexerSimple;
+
+// Structural tokens
+LBRACE: '{';
+RBRACE: '}';
+LBRACK: '[';
+RBRACK: ']';
+COLON: ':';
+COMMA: ',';
+
+// Literals
+TRUE: 'true';
+FALSE: 'false';
+NULL: 'null';
+
+// String - using same format as JavaScript
+STRING: /"\"[a-zA-Z0-9 ]*\""/;
+
+// Number - simple version
+NUMBER: /"[0-9]+"/;
+
+// Whitespace
+WS: /"[ \t\r\n]+"/-> skip;

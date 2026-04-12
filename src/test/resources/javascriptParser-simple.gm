@@ -1,0 +1,68 @@
+parser grammar JavaScriptParserSimple;
+
+root: statement+;
+
+statement
+    : variableDeclaration
+    | functionDeclaration
+    | ifStatement
+    | whileStatement
+    | returnStatement
+    | expressionStatement
+    | block
+    ;
+
+variableDeclaration
+    : (LET | CONST | VAR) IDENTIFIER (ASSIGN expression)? SEMI
+    ;
+
+functionDeclaration
+    : FUNCTION IDENTIFIER LPAREN parameterList? RPAREN block
+    ;
+
+parameterList
+    : IDENTIFIER (COMMA IDENTIFIER)*
+    ;
+
+ifStatement
+    : IF LPAREN expression RPAREN statement (ELSE statement)?
+    ;
+
+whileStatement
+    : WHILE LPAREN expression RPAREN statement
+    ;
+
+returnStatement
+    : RETURN expression? SEMI
+    ;
+
+expressionStatement
+    : expression SEMI
+    ;
+
+block
+    : LBRACE statement* RBRACE
+    ;
+
+expression
+    : expression (STAR | SLASH) expression
+    | expression (PLUS | MINUS) expression
+    | expression (EQ | NEQ | LT | GT | LE | GE) expression
+    | primary
+    ;
+
+primary
+    : IDENTIFIER
+    | NUMBER
+    | STRING
+    | LPAREN expression RPAREN
+    | functionCall
+    ;
+
+functionCall
+    : IDENTIFIER LPAREN argumentList? RPAREN
+    ;
+
+argumentList
+    : expression (COMMA expression)*
+    ;

@@ -1,0 +1,9 @@
+parser grammar TestSemicolon;
+
+options {
+    tokenVocab = JavaScriptLexerSimple;
+}
+
+root
+    : SEMI
+    ;
