@@ -291,8 +291,11 @@ DEFAULT_MODE  → BackTick "`" (relabelled from BackTickEnd)
 
 | Document | Description |
 |----------|-------------|
+| [Docs Index](docs/index.md) | 用户 / SDK / 二次开发文档入口 |
+| [Design Index](spec/index.md) | 架构 / 解析模型 / 性能权衡入口 |
 | [Lexer Grammar Reference](docs/lexer-grammar.md) | Token rules, fragments, modes, commands |
 | [Parser Grammar Reference](docs/parser-grammar.md) | Rules, quantifiers, predicates, left recursion |
+| [Paper Index](docs/paper/index.md) | 论文主稿、评测与投稿材料 |
 
 ---
 
