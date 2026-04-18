@@ -42,6 +42,19 @@ public class NonTerminals implements SymbolTypes<NonTerminal> {
         }
         return my;
     }
+
+    /**
+     * Returns a <em>fresh</em> {@code NonTerminals} instance for a user-defined
+     * language. Unlike {@link #my()}, this does not share state with any other
+     * parser &mdash; required whenever multiple user grammars are built in the
+     * same JVM (e.g. the grammars-v4 compatibility harness), because the user
+     * grammar builder mutates this collection by registering every lexer /
+     * parser rule it sees. Sharing a singleton causes rules from grammar A to
+     * leak into grammar B's predict table.
+     */
+    public static NonTerminals newMy() {
+        return new NonTerminals();
+    }
     private static NonTerminals lexer = null;
 
     /**

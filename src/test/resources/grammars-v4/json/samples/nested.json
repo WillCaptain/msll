@@ -1,0 +1,6 @@
+{
+  "user": {"name":"alice","roles":["admin","dev"]},
+  "count": 3,
+  "active": true,
+  "extra": null
+}

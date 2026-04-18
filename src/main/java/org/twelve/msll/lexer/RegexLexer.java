@@ -4,6 +4,7 @@ import lombok.SneakyThrows;
 import org.twelve.msll.exception.LexerException;
 import org.twelve.msll.grammarsymbol.Terminal;
 import org.twelve.msll.grammarsymbol.Terminals;
+// (Terminal is used via the probed newline terminal above)
 import org.twelve.msll.util.Constants;
 
 import java.io.Reader;
@@ -51,6 +52,45 @@ public class RegexLexer extends Lexer {
     private String currentMode = "DEFAULT_MODE";
     /** Mode stack for pushMode / popMode operations. */
     private final Deque<String> modeStack = new ArrayDeque<>();
+
+    // -----------------------------------------------------------------------
+    // Optional newline-as-token support
+    // -----------------------------------------------------------------------
+    /**
+     * MSLL is fundamentally a line-oriented lexer: {@link #tokenize(char, int, int, Consumer)}
+     * flushes the current buffered line whenever it sees {@code \r} or {@code \n},
+     * and the newline characters themselves never enter the per-line token
+     * stream. This makes grammars that treat newlines as <em>significant</em>
+     * tokens (CSV, properties, INI, etc.) unparseable out of the box.
+     *
+     * <p>To bridge that gap without disturbing line-oriented grammars, we
+     * probe the terminal set once — if the user grammar declares a terminal
+     * whose literal pattern is exactly {@code "\n"} (or {@code "\r\n"}), we
+     * synthesise one token per newline and feed it into the consumer after
+     * the line's own tokens. Grammars that do not declare such a terminal
+     * see no behaviour change.
+     */
+    private Terminal newlineTerminal = null;
+    private boolean newlineProbed = false;
+
+    private Terminal probeNewlineTerminal() {
+        if (!newlineProbed) {
+            // Literal strings are stored verbatim as they appear between the
+            // single quotes in the .gm source. In ANTLR4 / MSLL grammars the
+            // newline token is usually written as {@code '\n'}, which after
+            // quote-stripping is the two-character lexeme "\\n", not the
+            // control character '\n'. We therefore probe both forms so we
+            // match both conventions.
+            String[] newlineLexemes = {"\n", "\\n", "\r\n", "\\r\\n"};
+            for (String lex : newlineLexemes) {
+                newlineTerminal = this.terminals.findTerminalForLexeme(lex);
+                if (newlineTerminal != null) break;
+            }
+            newlineProbed = true;
+        }
+        return newlineTerminal;
+    }
+
     @SneakyThrows
     @Override
     protected void tokenize(char ch, int charIndex, int lineIndex, Consumer<Token> consumer){
@@ -64,6 +104,19 @@ public class RegexLexer extends Lexer {
                     consumer.accept(token);
                 }
                 preCharIndex = charIndex;
+            }
+            // Emit one synthesised newline token per '\n' (the dominant line
+            // terminator). We intentionally ignore lone '\r' to avoid double-
+            // emitting on '\r\n' sequences (tokenize() fires once for '\r'
+            // and once for '\n' on CRLF input). Classic-Mac '\r'-only inputs
+            // are an explicit non-goal for now.
+            if (ch == '\n') {
+                Terminal nl = probeNewlineTerminal();
+                if (nl != null) {
+                    consumer.accept(new Token(nl, "\n",
+                            new Location(charIndex, charIndex + 1,
+                                    new Line(lineIndex, preCharIndex))));
+                }
             }
         }
         if (ch == eof) {

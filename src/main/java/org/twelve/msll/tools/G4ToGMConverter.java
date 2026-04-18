@@ -48,12 +48,45 @@ public class G4ToGMConverter {
     private static String convertLexer(String content) {
         String result = content;
 
+        // Rewrite ANTLR4 char-range shorthand into a char class:
+        //   'a' .. 'z'   →  [a-z]
+        //   '0'..'9'     →  [0-9]
+        // MSLL's LexerRuleCompiler has no native understanding of the '..'
+        // range operator; treating each side as a STRING atom would produce
+        // the wrong regex (\Qa\E\Q..\E\Qz\E). Rewriting to a char class
+        // gives LexerRuleCompiler a shape it already handles correctly.
+        result = rewriteCharRanges(result);
+
         // Convert character classes to regex format if not already
         // [a-z] -> /"[a-z]"/
         // But be careful not to convert if already in quotes or regex format
         result = convertCharacterClasses(result);
 
         return result;
+    }
+
+    /**
+     * Rewrites ANTLR4 char-range shorthand {@code 'X' .. 'Y'} (in any amount
+     * of whitespace) into the equivalent char class {@code [X-Y]}. Matches
+     * only single-character literals on both sides to avoid corrupting
+     * multi-char strings. Backslash-escaped characters are preserved.
+     */
+    private static String rewriteCharRanges(String content) {
+        // Match a single-char literal — either a bare char or a backslash-
+        // escape — surrounded by single quotes, then '..', then another
+        // single-char literal. '\\'' (escaped quote) is tolerated.
+        Pattern p = Pattern.compile(
+                "'(\\\\.|[^\\\\'])'\\s*\\.\\.\\s*'(\\\\.|[^\\\\'])'");
+        Matcher m = p.matcher(content);
+        StringBuffer out = new StringBuffer();
+        while (m.find()) {
+            String lo = m.group(1);
+            String hi = m.group(2);
+            m.appendReplacement(out,
+                    Matcher.quoteReplacement("[" + lo + "-" + hi + "]"));
+        }
+        m.appendTail(out);
+        return out.toString();
     }
 
     private static String convertParser(String content) {
@@ -64,6 +97,13 @@ public class G4ToGMConverter {
         result = result.replaceAll("\\s+EOF\\s*;", " ;");
         result = result.replaceAll("\\s+EOF\\s*\\|", " |");
 
+        // Drop trailing empty alternatives like "... | ;" or "... |\n;" —
+        // ANTLR4 grammars occasionally use them to express an epsilon match,
+        // but MSLL's .gm parser does not accept a bare '|' before ';'.
+        result = result.replaceAll("\\|\\s*;", ";");
+        // Same for a leading empty alt immediately after ':'.
+        result = result.replaceAll(":\\s*\\|", ":");
+
         // Find first parser rule and rename to 'root' if not already
         Pattern firstRulePattern = Pattern.compile(
             "^([a-z][a-zA-Z0-9_]*)\\s*:",
@@ -73,9 +113,11 @@ public class G4ToGMConverter {
         if (matcher.find()) {
             String firstRuleName = matcher.group(1);
             if (!firstRuleName.equals("root")) {
-                // Rename first rule to root
+                // Rename the rule's own declaration head. The parser file starts
+                // with a prologue + 'parser grammar X;' + options block, so we
+                // need MULTILINE anchoring (not start-of-input).
                 result = result.replaceFirst(
-                    "^" + firstRuleName + "\\s*:",
+                    "(?m)^" + Pattern.quote(firstRuleName) + "\\s*:",
                     "root:"
                 );
                 System.out.println("  Renamed first rule '" + firstRuleName + "' to 'root'");

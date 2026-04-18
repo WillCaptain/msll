@@ -69,7 +69,27 @@ public class Terminals implements SymbolTypes<Terminal> {
      */
     public synchronized static Terminals my() {
         if (myTerminals == null) {
-            myTerminals = new Terminals();
+            myTerminals = buildMyTerminals();
+        }
+        return myTerminals;
+    }
+
+    /**
+     * Returns a <em>fresh</em> {@code Terminals} instance seeded with the same
+     * built-in operator / punctuation terminals as {@link #my()}. Unlike
+     * {@link #my()}, no state is shared across calls &mdash; necessary when
+     * multiple user grammars are built in the same JVM (e.g. the grammars-v4
+     * compatibility harness), since the user grammar builder mutates its
+     * {@code Terminals} collection by registering every lexer rule it sees.
+     * Reusing the singleton makes rules from grammar A leak into grammar B's
+     * predict table.
+     */
+    public static Terminals newMy() {
+        return buildMyTerminals();
+    }
+
+    private static Terminals buildMyTerminals() {
+        Terminals myTerminals = new Terminals();
             // Support escape sequences (e.g. \n, \t, \") inside string literals
             myTerminals.addTerminal(Constants.STRING, new RegexString("(\\\"(?:[^\\\"\\\\]|\\\\.)*\\\")"));
             myTerminals.addTerminal(Constants.PLUS_PLUS_STR, Constants.PLUS_PLUS);
@@ -106,8 +126,6 @@ public class Terminals implements SymbolTypes<Terminal> {
             myTerminals.addTerminal(Constants.ENTER, new RegexString("\\S* \\n"));
             myTerminals.addTerminal(Constants.DOUBLE, new RegexString("(?<![\\w.])-?\\d+(?:\\.\\d+)?(?!\\.\\d)[d](?!\\w)"));
             myTerminals.addTerminal(Constants.FLOAT, new RegexString("(?<![\\w.])-?\\d+(?:\\.\\d+)?(?!\\.\\d)[f](?!\\w)"));
-
-        }
         return myTerminals;
     }
 
@@ -264,6 +282,35 @@ public class Terminals implements SymbolTypes<Terminal> {
         } else {
             return null;
         }
+    }
+
+    /**
+     * Finds a user-defined terminal whose compiled pattern fully matches the
+     * given literal lexeme. Used by {@link org.twelve.msll.lexer.RegexLexer}
+     * to decide whether to synthesise a newline token on line boundaries when
+     * the user grammar declares {@code '\n'}, {@code '\r\n'}, or {@code '\r'}
+     * as an explicit token (e.g. CSV / properties / INI style grammars).
+     *
+     * <p>The built-in {@code WHITESPACE}, {@code EPSILON} and {@code EOL}
+     * terminals are skipped so we do not accidentally return a sentinel.
+     *
+     * @param lexeme literal string to probe (e.g. {@code "\n"})
+     * @return matching user terminal, or {@code null} if none declared
+     */
+    public Terminal findTerminalForLexeme(String lexeme) {
+        if (lexeme == null || lexeme.isEmpty()) return null;
+        for (Terminal t : this.terminals) {
+            String n = t.name();
+            if (n.equals(Constants.WHITESPACE_STR)
+                    || n.equals(Constants.EPSILON_STR)
+                    || n.equals(Constants.EOL_STR)
+                    || n.equals(Constants.END_STR)) continue;
+            Matcher m = t.compiledPattern().matcher(lexeme);
+            if (m.matches()) {
+                return t;
+            }
+        }
+        return null;
     }
 
     public Terminal fromPattern(String pattern) {

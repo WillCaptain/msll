@@ -156,6 +156,15 @@ public abstract class MsllParser<P extends ParserTree> {
      */
     private final NonTerminalNode startNode;
 
+    /**
+     * Collected syntax errors from the most recent parse.
+     * Populated by {@link #parse()} (via exception) and by {@link #parseResilient()}.
+     * Exposed to callers via {@link #syntaxErrors()} so that downstream tooling
+     * (IDE markers, language servers, etc.) can report diagnostics without relying
+     * on exception control-flow.
+     */
+    private List<GrammarSyntaxException> syntaxErrors = java.util.Collections.emptyList();
+
     public MsllParser(Grammars grammars, PredictTable predictTable, NonTerminals nonTerminals, Terminals terminals, Reader reader) {
         this.grammars = grammars;
         this.lexer = new RegexLexer(reader, terminals);
@@ -492,7 +501,50 @@ public abstract class MsllParser<P extends ParserTree> {
             }
             throw new GrammarSyntaxException("parsing error: " + e.getMessage());
         }
+        this.syntaxErrors = java.util.Collections.emptyList();
         return this.done();
+    }
+
+    /**
+     * Resilient variant of {@link #parse()} that never throws a syntax exception:
+     * all collected {@link GrammarSyntaxException}s are exposed via
+     * {@link #syntaxErrors()} and a best-effort (possibly partial) parse tree is
+     * returned so that downstream tooling (converters, IDE markers, type
+     * inference) can continue operating on correct portions of the input.
+     *
+     * <p>Uses {@link #parse()} under the hood and catches the aggregate/single
+     * syntax exception so that existing panic-mode recovery logic is reused
+     * verbatim; only the "fail fast vs. continue" policy differs.
+     *
+     * @return the (possibly partially-polished) parse tree
+     */
+    public P parseResilient() {
+        try {
+            P tree = parse();
+            return tree;
+        } catch (AggregateGrammarSyntaxException agg) {
+            this.syntaxErrors = new ArrayList<>(agg.errors());
+        } catch (GrammarSyntaxException gse) {
+            List<GrammarSyntaxException> single = new ArrayList<>();
+            single.add(gse);
+            this.syntaxErrors = single;
+        }
+        // Best-effort polish so the caller can walk the partially-built tree.
+        try {
+            parseTree.polish();
+        } catch (Throwable ignored) {
+            // A partial tree may not polish cleanly; that is acceptable.
+        }
+        return parseTree;
+    }
+
+    /**
+     * @return syntax errors collected during the last parse call.
+     *         Empty if the last parse completed without any syntax errors,
+     *         or if no parse has been performed yet.
+     */
+    public List<GrammarSyntaxException> syntaxErrors() {
+        return java.util.Collections.unmodifiableList(this.syntaxErrors);
     }
 
     /**

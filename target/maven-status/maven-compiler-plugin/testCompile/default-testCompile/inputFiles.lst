@@ -27,3 +27,9 @@
 /Users/imac/Documents/code/github/msll/src/test/java/org/twelve/msll/evaluation/Step7_TestJSWithBraces.java
 /Users/imac/Documents/code/github/msll/src/test/java/org/twelve/msll/evaluation/Step8_TestBlockOnly.java
 /Users/imac/Documents/code/github/msll/src/test/java/org/twelve/msll/evaluation/Step9_TestSingleToken.java
+/Users/imac/Documents/code/github/msll/src/test/java/org/twelve/msll/grammarsv4/CsvProbeTest.java
+/Users/imac/Documents/code/github/msll/src/test/java/org/twelve/msll/grammarsv4/GrammarsV4CompatRunner.java
+/Users/imac/Documents/code/github/msll/src/test/java/org/twelve/msll/grammarsv4/GrammarsV4CompatTest.java
+/Users/imac/Documents/code/github/msll/src/test/java/org/twelve/msll/grammarsv4/ImplicitTokenProbeTest.java
+/Users/imac/Documents/code/github/msll/src/test/java/org/twelve/msll/grammarsv4/LexerFeatureProbeTest.java
+/Users/imac/Documents/code/github/msll/src/test/java/org/twelve/msll/grammarsv4/NoGrammarLeakTest.java

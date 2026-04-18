@@ -46,7 +46,11 @@ public class MyParserBuilder extends ParserBuilder<ParserTreeGrammarBuilder, MyP
      * @param lexerRuleTree The parsed grammar tree for the lexer.
      */
     private MyParserBuilder(ParserGrammarTree parserGrammarTree, LexerRuleTree lexerRuleTree) {
-        super(new ParserTreeGrammarBuilder(parserGrammarTree, lexerRuleTree, NonTerminals.my(), Terminals.my()));
+        // Use fresh Terminals/NonTerminals instances so user-grammar rules
+        // registered during build do not leak across MyParserBuilder instances
+        // (see Terminals#newMy / NonTerminals#newMy for details).
+        super(new ParserTreeGrammarBuilder(parserGrammarTree, lexerRuleTree,
+                NonTerminals.newMy(), Terminals.newMy()));
         this.parserGrammarTree = parserGrammarTree;
         this.lexerRuleTree = lexerRuleTree;
     }
