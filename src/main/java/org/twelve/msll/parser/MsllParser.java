@@ -325,9 +325,17 @@ public abstract class MsllParser<P extends ParserTree> {
         // keep epsilon productions alongside non-epsilon ones to resolve targeted FIRST/FOLLOW
         // conflicts without global side-effects.  Epsilon is sorted first so the non-epsilon
         // explain() is written last in the loop below (it "wins" as the node's explain).
+        // Two sources feed this flag:
+        //   (1) epsilonAlongsideGrammars: a hand-curated whitelist set up by
+        //       subclasses (e.g. MyParser) to override specific conflict cells;
+        //   (2) predictTable.hasEpsilonAlongside(...): every FIRST/FOLLOW cell
+        //       the table itself detected as conflicted at build time.
+        // Either source is enough to keep an epsilon production alongside the
+        // non-empty ones so the multi-stack runtime can explore both paths.
         java.util.Set<String> epsilonTerminals = epsilonAlongsideGrammars.get(grammar.name());
-        boolean epsilonAlongside = epsilonTerminals != null
-                && epsilonTerminals.contains(token.terminal().name());
+        boolean epsilonAlongside = (epsilonTerminals != null
+                && epsilonTerminals.contains(token.terminal().name()))
+                || this.predictTable.hasEpsilonAlongside(grammar.name(), token.terminal().name());
         List<Production> productions = this.predictTable.match(token, grammar, line).stream()
                 .filter(p -> p != null && (epsilonAlongside || !p.isEmpty()))
                 .collect(Collectors.toList());

@@ -9,8 +9,10 @@ import org.twelve.msll.util.Tool;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -27,6 +29,31 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class PredictTable {
     // The prediction table is represented as a map where each terminal maps to a grammar's list of possible productions.
     private final Map<Terminal, Map<Grammar, List<Production>>> table = new HashMap<>();
+
+    /**
+     * (grammarName -> {terminalName,...}) cells where an &epsilon;-producing
+     * production coexists with a non-&epsilon; production in the same cell.
+     *
+     * <p>These are the LL(1) FIRST/FOLLOW conflicts MSLL resolves by forking
+     * the parse stack: one fork takes the non-&epsilon; path, the other takes
+     * &epsilon; (effectively "stop here and bubble up"). Whichever fork parses
+     * the rest of the input wins; the other dies on a grammar exception and is
+     * pruned. This is MSLL's runtime analogue of ANTLR4's adaptive LL*.
+     *
+     * <p>Computed once at table construction time (see {@link #detectConflicts()}),
+     * read by {@link MsllParser#matchNonTerminalToken} to decide whether to keep
+     * epsilon alongside.
+     */
+    private final Map<String, Set<String>> epsilonAlongsideCells = new HashMap<>();
+
+    /**
+     * When {@code false} (default), {@link #hasEpsilonAlongside} always returns
+     * {@code false} and the parser relies solely on the hand-curated whitelist
+     * in {@link MsllParser#epsilonAlongsideGrammars}. This preserves byte-exact
+     * behaviour for every grammar that existed before auto-conflict detection
+     * landed. The G4 loader path flips this on to get ANTLR4-style semantics.
+     */
+    private boolean autoEpsilonAlongsideEnabled = false;
 
     /**
      * Builds the prediction table by populating it with grammar rules and their respective FIRST and FOLLOW sets.
@@ -53,6 +80,67 @@ public class PredictTable {
                 grammar.follow().forEach(symbol -> addMapping(grammar, null, symbol));
             }
         });
+        detectConflicts();
+    }
+
+    /**
+     * Walks the finished table and records every (grammar, terminal) cell that
+     * contains <em>both</em> an empty and a non-empty production. Those cells
+     * are the classic LL(1) FIRST/FOLLOW conflict points where a Kleene closure
+     * (X*, X?, (...)?) could legitimately end <em>or</em> continue on the same
+     * token &mdash; for example ABNF's {@code rule_*} where FIRST(rule_) and
+     * FOLLOW(rulelist) both contain {@code ID}.
+     *
+     * <p>Conflict cells are exposed via {@link #hasEpsilonAlongside(String, String)}
+     * so the runtime can fork the parse stack instead of silently preferring the
+     * non-empty branch.
+     */
+    private void detectConflicts() {
+        for (Map.Entry<Terminal, Map<Grammar, List<Production>>> byTerm : table.entrySet()) {
+            String terminalName = byTerm.getKey().name();
+            for (Map.Entry<Grammar, List<Production>> byGrammar : byTerm.getValue().entrySet()) {
+                List<Production> ps = byGrammar.getValue();
+                if (ps.size() < 2) continue;
+                boolean hasEmpty = false, hasNonEmpty = false;
+                for (Production p : ps) {
+                    if (p == null) continue;
+                    if (p.isEmpty()) hasEmpty = true; else hasNonEmpty = true;
+                }
+                if (hasEmpty && hasNonEmpty) {
+                    epsilonAlongsideCells
+                            .computeIfAbsent(byGrammar.getKey().name(), k -> new HashSet<>())
+                            .add(terminalName);
+                }
+            }
+        }
+    }
+
+    /**
+     * @return true when {@code (grammarName, terminalName)} is a FIRST/FOLLOW
+     * conflict cell and the runtime should keep &epsilon; productions alongside
+     * non-&epsilon; ones rather than filtering them out.
+     */
+    public boolean hasEpsilonAlongside(String grammarName, String terminalName) {
+        if (!autoEpsilonAlongsideEnabled) return false;
+        Set<String> terms = epsilonAlongsideCells.get(grammarName);
+        return terms != null && terms.contains(terminalName);
+    }
+
+    /**
+     * Opt-in switch for the auto-detected {@link #epsilonAlongsideCells}. Leave
+     * unset for legacy MSLL grammars (unchanged behaviour); flip on for G4-loaded
+     * grammars, where MSLL is aiming to mimic ANTLR4's adaptive lookahead.
+     */
+    public void setAutoEpsilonAlongsideEnabled(boolean enabled) {
+        this.autoEpsilonAlongsideEnabled = enabled;
+    }
+
+    /**
+     * Exposed for tests / diagnostics: the full set of auto-detected conflict
+     * cells, regardless of whether auto-mode is enabled.
+     */
+    public Map<String, Set<String>> autoEpsilonAlongsideCells() {
+        return epsilonAlongsideCells;
     }
 
     /**

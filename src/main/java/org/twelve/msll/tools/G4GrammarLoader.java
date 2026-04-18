@@ -103,6 +103,12 @@ public final class G4GrammarLoader {
 
         MyParserBuilder builder = new MyParserBuilder(
                 new StringReader(parserGm), new StringReader(lexerGm));
+        // Flip on ANTLR4-style conflict handling: any FIRST/FOLLOW cell that the
+        // predict table detected as conflicted will fork the parse stack between
+        // its empty and non-empty alternatives at runtime. Kept off by default
+        // to preserve byte-exact behaviour for legacy .gm grammars that were
+        // hand-tuned against the original greedy semantics.
+        builder.predictTable().setAutoEpsilonAlongsideEnabled(true);
         return new Loaded(builder, lexerGm, parserGm, lifted.liftedCount);
     }
 }

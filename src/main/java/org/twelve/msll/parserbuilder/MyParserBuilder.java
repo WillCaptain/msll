@@ -99,6 +99,17 @@ public class MyParserBuilder extends ParserBuilder<ParserTreeGrammarBuilder, MyP
     }
 
     /**
+     * Exposes this builder's {@link org.twelve.msll.parser.PredictTable} so
+     * callers in the G4 loading pipeline can flip ANTLR4-style conflict
+     * handling on (auto epsilon-alongside for every FIRST/FOLLOW cell with
+     * both &epsilon; and non-&epsilon; productions). Legacy {@code .gm}-based
+     * callers leave this untouched and keep the original greedy semantics.
+     */
+    public org.twelve.msll.parser.PredictTable predictTable() {
+        return this.predictTable;
+    }
+
+    /**
      * Returns the `ParserGrammarTree` which contains the grammar structure for the parser.
      *
      * @return The parsed grammar tree for the parser.

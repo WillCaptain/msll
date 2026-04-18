@@ -18,19 +18,19 @@ two minimal grammars we wrote ourselves to stress specific features).
 
 | Grammar      | Stage | Samples | Notes                                                        |
 |--------------|-------|---------|--------------------------------------------------------------|
+| abnf         | OK    | 1/1     | FIRST/FOLLOW auto-fork (PR-L1); previously failed on L1.     |
 | calculator   | OK    | 2/2     | Float, scientific notation; char-ranges `'0'..'9'` (PR-3).   |
 | csv          | OK    | 1/1     | Newlines are real tokens (PR-1).                             |
 | json         | OK    | 2/2     | Nested objects/arrays, fragments, Unicode escapes.           |
 | pystring     | OK    | 1/1     | Triple-quoted strings spanning multiple physical lines (PR-2). |
 | sexpression  | OK    | 1/1     | Atom/list recursion; char-ranges (PR-3).                     |
 | url          | OK    | 1/1     | The original smoke test.                                     |
-| abnf         | PARSE | 0/1     | **Limitation L1** — non-adaptive lookahead (§3).             |
-| focal        | PARSE | 0/1     | **Limitation L2** — ambiguous maximal munch.                 |
+| focal        | PARSE | 0/1     | **Residual L2′** — built-in STRING terminal conflict.        |
 | properties   | PARSE | 0/1     | **Limitation L3** — no lexer modes.                          |
 | ini          | PARSE | 0/1     | **Limitation L3** — no lexer modes.                          |
 | javascript   | LOAD  | 0/1     | **Limitation L4** — embedded target-language actions.        |
 
-**Summary: 6/11 grammars fully compatible, unmodified.**
+**Summary: 7/11 grammars fully compatible, unmodified.**
 
 The `javascript` row uses the *unmodified, upstream* `JavaScriptLexer.g4`
 and `JavaScriptParser.g4` pulled straight from
@@ -85,6 +85,44 @@ three adjacent string literals rather than a character class. Added a
 pre-processing step in `G4ToGMConverter` that rewrites the range into a
 standard `[X-Y]` class before compilation.
 
+### PR-L1: Auto FIRST/FOLLOW fork (*abnf*)
+MSLL already owns a multi-stack runtime — at a non-terminal with
+multiple matching productions, it forks the stack, explores in parallel,
+and prunes forks that die on subsequent tokens. The pre-existing code
+however *filtered out* ε productions unless the `(grammar, terminal)`
+pair was on a hand-curated whitelist (`epsilonAlongsideGrammars`), so
+classical LL(1) conflicts (Kleene closure over a token also in the
+closure's FOLLOW set) silently took the greedy branch and broke
+grammars like ABNF where the greedy branch is wrong.
+
+*Fix.* When `PredictTable` is built, scan every cell: if it holds both
+an ε and a non-ε production, remember it. The G4 loader flips
+`setAutoEpsilonAlongsideEnabled(true)` so any such cell keeps ε
+alongside non-ε at parse time; the multi-stack runtime then forks and
+lets whichever branch consumes the rest of the input win. Existing
+legacy `.gm` grammars keep the byte-exact old behaviour by leaving the
+flag off. **Regression tests:** `FirstFollowConflictForkTest`,
+`AbnfProbeTest`.
+
+### PR-L2: Cross-rule inlining in `LexerRuleCompiler` (*focal*)
+MSLL's lexer-rule compiler was only inlining `fragment` rules. Any
+*non-fragment* lexer rule that referenced another lexer rule fell
+through to `Pattern.quote(name)` — the reference got emitted as a
+literal string match against the rule *name*. Under focal.g4's
+`INTEGER : DIGIT+` and `VARIABLE : ALPHA (ALPHA | DIGIT)*`, the
+compiled INTEGER pattern matched the literal string "DIGIT" and could
+not match any digits at all; the lexer then had no choice but to
+produce the primitive `DIGIT` token, which the parser was not expecting.
+This was the real cause of the apparent "first-match-wins lexer tie
+break" symptom we originally labelled L2.
+
+*Fix.* Treat every regular lexer rule the same way fragments are
+treated: register its compiled regex into the shared `fragments` map so
+that subsequent rules inline it on reference. Forward references are
+resolved by iterating the compile pass until the map stabilises (a
+fixed-point loop bounded by the rule count). **Regression test:**
+`LexerRuleInliningTest`.
+
 ## 3. What the remaining failures tell us
 
 The four PARSE failures are not bugs in the conversion pipeline; they
@@ -92,25 +130,34 @@ pinpoint three *intrinsic* MSLL architectural choices. Each is an honest
 limitation to name in the paper's discussion, not something to paper
 over in the matrix.
 
-### L1 — Non-adaptive LL lookahead (*abnf*)
-ANTLR4's adaptive LL(\*) resolves ambiguity by exploring the input
-arbitrarily far ahead; MSLL commits to a fixed-length prediction. The
-ABNF grammar's `rule_ : ID '=' '/'? elements ; root : rule_* ;`
-repetition is unambiguous with adaptive lookahead (ANTLR scans forward,
-sees the next `ID '='`, and starts a fresh `rule_`) but unambiguous*ly*
-fails under MSLL: once inside the first `rule_`'s `elements`, the parser
-has no way to know the next `ID '='` is a boundary and chokes on `=`.
-This is inherent to the parsing class and will not be fixed without
-adopting a more expressive prediction automaton.
+### L1 — ~~Non-adaptive LL lookahead~~ Resolved via multi-stack fork (PR-L1)
+*Originally attributed to fixed-length lookahead.* In fact MSLL's
+multi-stack runtime is expressive enough to cover the ABNF case — it
+just needed to be **told** the FIRST/FOLLOW cell was ambiguous. PR-L1
+now detects those cells at table-build time and flips the runtime into
+fork-both-branches mode for G4-loaded grammars, and ABNF parses
+unmodified. True adaptive LL(\*) remains future work, but the
+commonly-cited symptom (Kleene closure whose continuation token is
+also in FOLLOW) is covered.
 
-### L2 — Ambiguous maximal munch across lexer rules (*focal*)
-When two lexer rules can match the same prefix of the same length
-(e.g. `DIGIT : [0-9] ;` and `INTEGER : [0-9]+ ;` on a single-digit
-input), ANTLR4 breaks the tie in favour of the rule declared *first*
-while still allowing later rules to win on longer inputs. MSLL's
-first-match-wins behaviour is coarser and does not recompute when a
-shorter match would satisfy the current parse state. Focal's numeric
-rules trip over this.
+### L2 — ~~Ambiguous maximal munch~~ Cross-rule inlining (PR-L2)
+*Originally attributed to lexer tie-breaking.* Diagnostics showed the
+real issue: MSLL was only inlining rules declared `fragment`; regular
+lexer rules referenced from another rule body were silently emitted as
+literal `Pattern.quote(name)` matches. `INTEGER : DIGIT+` compiled to a
+regex that matched the literal string "DIGIT", which of course never
+matched actual input, so the primitive `DIGIT` rule was the only one
+that could fire. PR-L2 makes every lexer rule inlineable, resolves
+forward references by fixed-point iteration, and focal's numeric rules
+parse correctly.
+
+*Residual L2′.* Focal still fails at the vendored sample, but one token
+later and for a different reason: MyParser installs a built-in
+`STRING` terminal (`"..."`) for Outline-style languages, and that
+terminal out-competes focal's own `STRING_LITERAL`. This is a
+cross-contamination between MSLL's built-in lexer seed and G4-loaded
+grammars, not a lexer-tie-breaking limitation; fixing it is scoped as
+a follow-up.
 
 ### L3 — No lexer modes (*properties, ini*)
 Real `.properties` and `.ini` grammars lean on ANTLR4 **lexer modes** to
@@ -161,4 +208,5 @@ matrix with honest failure attribution, not a cherry-picked 100% score.
   regenerates this table at `target/grammars-v4-compat.md`.
 - Probe-level regressions for each PR live next to the harness:
   `NoGrammarLeakTest`, `NewlineTokenSynthesisTest`,
-  `MultiLineTokenTest`, `LexerFeatureProbeTest`.
+  `MultiLineTokenTest`, `LexerFeatureProbeTest`,
+  `FirstFollowConflictForkTest` (PR-L1), `LexerRuleInliningTest` (PR-L2).

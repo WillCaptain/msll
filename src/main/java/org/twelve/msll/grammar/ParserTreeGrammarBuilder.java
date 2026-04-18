@@ -81,8 +81,40 @@ public class ParserTreeGrammarBuilder extends GrammarBuilder {
             fragmentRegexes.put(fragName, fragRegex);
         }
 
-        // Pass 2: compile regular terminals, tracking lexer mode per rule
-        for (Map.Entry<String, NonTerminalNode> entry : lexerRuleTree.allGrammarsWithModes()) {
+        // Pass 2a: compile regular lexer rules into the SAME inline map so that
+        // cross-rule references (e.g. `INTEGER : DIGIT+ ;` referencing `DIGIT`)
+        // expand to the referenced rule's regex rather than to Pattern.quote("DIGIT").
+        // This mirrors ANTLR4 semantics: every lexer rule is inlineable when
+        // referenced from another lexer rule, whether it's declared `fragment`
+        // or not. Forward references are resolved by iterating until the map
+        // stabilises: on each pass every rule is re-compiled against the current
+        // map, so a reference to a rule compiled later in pass N-1 picks up its
+        // real regex in pass N. Bounded by the rule count to guard against
+        // pathological inputs.
+        List<AbstractMap.SimpleEntry<String, NonTerminalNode>> regularRules
+                = lexerRuleTree.allGrammarsWithModes();
+        int maxPasses = regularRules.size() + 1;
+        for (int pass = 0; pass < maxPasses; pass++) {
+            boolean changed = false;
+            for (AbstractMap.SimpleEntry<String, NonTerminalNode> entry : regularRules) {
+                NonTerminalNode grammar = entry.getValue();
+                NonTerminalNode terminalNode = findChild(grammar, Constants.TERMINAL);
+                NonTerminalNode lexBody     = findChild(grammar, Constants.LEX_BODY);
+                if (terminalNode == null || lexBody == null) continue;
+                String name = terminalNode.nodes().get(0).toString();
+                if (name.contains("'")) continue;
+                String regex = LexerRuleCompiler.compile(lexBody, fragmentRegexes);
+                String prev = fragmentRegexes.get(name);
+                if (!regex.equals(prev)) {
+                    fragmentRegexes.put(name, regex);
+                    changed = true;
+                }
+            }
+            if (!changed) break;
+        }
+
+        // Pass 2b: the map is now stable – emit the actual Terminals.
+        for (AbstractMap.SimpleEntry<String, NonTerminalNode> entry : regularRules) {
             String mode = entry.getKey();
             NonTerminalNode grammar = entry.getValue();
 
@@ -95,7 +127,8 @@ public class ParserTreeGrammarBuilder extends GrammarBuilder {
 
             TerminalNode lexerCommandNode = findTerminalChild(grammar, Constants.LEXER_COMMAND);
 
-            String regex = LexerRuleCompiler.compile(lexBody, fragmentRegexes);
+            String regex = fragmentRegexes.getOrDefault(name,
+                    LexerRuleCompiler.compile(lexBody, fragmentRegexes));
             // Pattern.quote("x") produces \Qx\E.  For plain keyword terminals we
             // must store the literal pattern (without \Q/\E) so that
             // Terminals.fromPattern("return") can still find the "Return" terminal.
