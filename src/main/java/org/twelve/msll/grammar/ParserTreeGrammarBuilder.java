@@ -70,15 +70,30 @@ public class ParserTreeGrammarBuilder extends GrammarBuilder {
         // Ordered map so earlier fragments can be referenced by later ones
         Map<String, String> fragmentRegexes = new LinkedHashMap<>();
 
-        // Pass 1: compile fragment rules
-        for (NonTerminalNode fragGrammar : lexerRuleTree.allFragments()) {
-            NonTerminalNode terminalNode = findChild(fragGrammar, Constants.TERMINAL);
-            NonTerminalNode lexBody     = findChild(fragGrammar, Constants.LEX_BODY);
-            if (terminalNode == null || lexBody == null) continue;
+        // Pass 1: compile fragment rules. Iterate until the map stabilises
+        // so that a fragment declared before one it references (common in
+        // real-world grammars like JavaScriptLexer.g4, where
+        // `IdentifierPart` references `IdentifierStart` which is declared
+        // on the next line) still resolves to the referenced fragment's
+        // regex instead of Pattern.quote("IdentifierStart").
+        List<NonTerminalNode> fragments = lexerRuleTree.allFragments();
+        int fragMaxPasses = fragments.size() + 1;
+        for (int pass = 0; pass < fragMaxPasses; pass++) {
+            boolean changed = false;
+            for (NonTerminalNode fragGrammar : fragments) {
+                NonTerminalNode terminalNode = findChild(fragGrammar, Constants.TERMINAL);
+                NonTerminalNode lexBody     = findChild(fragGrammar, Constants.LEX_BODY);
+                if (terminalNode == null || lexBody == null) continue;
 
-            String fragName  = terminalNode.nodes().get(0).toString();
-            String fragRegex = LexerRuleCompiler.compile(lexBody, fragmentRegexes);
-            fragmentRegexes.put(fragName, fragRegex);
+                String fragName  = terminalNode.nodes().get(0).toString();
+                String fragRegex = LexerRuleCompiler.compile(lexBody, fragmentRegexes);
+                String prev = fragmentRegexes.get(fragName);
+                if (!fragRegex.equals(prev)) {
+                    fragmentRegexes.put(fragName, fragRegex);
+                    changed = true;
+                }
+            }
+            if (!changed) break;
         }
 
         // Pass 2a: compile regular lexer rules into the SAME inline map so that

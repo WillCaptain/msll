@@ -99,6 +99,17 @@ public final class G4GrammarLoader {
             parserSrc = parserG4;
         }
 
+        // L4 fix: strip embedded target-language actions ({stmt;}) and
+        // semantic predicates ({expr}?) before anything else sees the
+        // grammar. MSLL's runtime interpreter has no target-language
+        // evaluator, so these are dropped; predicates degrade to
+        // "always true", actions become no-ops. Done here (not inside
+        // the converter) so G4ImplicitTokens.lift and G4ToGMConverter
+        // never encounter action braces that could be mistaken for
+        // structural tokens.
+        lexerSrc = G4ActionStripper.strip(lexerSrc);
+        parserSrc = G4ActionStripper.strip(parserSrc);
+
         // Lift implicit literals before the .gm syntax conversion so that
         // the converter only sees declared terminals.
         G4ImplicitTokens.Result lifted = G4ImplicitTokens.lift(lexerSrc, parserSrc);

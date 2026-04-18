@@ -37,6 +37,21 @@ public class Terminals implements SymbolTypes<Terminal> {
      * Cleared whenever terminals change (same lifecycle as cachedTerminalArray).
      */
     private final Map<String, Terminal[]> modeTerminalCache = new HashMap<>();
+
+    /**
+     * Maps terminal names that have been absorbed into another terminal (because
+     * they shared the same pattern and mode, typically after action/predicate
+     * stripping in G4 loading) to their canonical terminal. Lets parser rules
+     * that reference the absorbed name still resolve to a real terminal.
+     *
+     * <p>Example: ANTLR4's {@code TemplateCloseBrace : {pred}? '}' -> popMode;}
+     * becomes {@code TemplateCloseBrace : '}' -> popMode;} after L4 stripping,
+     * which collides with {@code CloseBrace : '}'} in the same mode. We keep
+     * {@code CloseBrace} as the canonical terminal and record
+     * {@code TemplateCloseBrace -> CloseBrace} here so the parser rule
+     * {@code ... TemplateCloseBrace ...} still resolves.
+     */
+    private final Map<String, Terminal> nameAliases = new HashMap<>();
     public final Terminal END;
     public final Terminal EOL;
     public final Terminal OR_OR;
@@ -195,7 +210,15 @@ public class Terminals implements SymbolTypes<Terminal> {
         if (lexerTerminals == null) {
             lexerTerminals = new Terminals();
             // Allow the opposite-quote type inside: 'can contain "' and "can contain '"
-            lexerTerminals.addTerminal(Constants.STRING, new RegexString("'[^']*'|\"[^\"]*\""));
+            // ANTLR4 allows `\\` escapes inside single-quoted literals (e.g.
+            // `'\''` for a single-quote character, `'\\\\' ` for backslash,
+            // `'\r'` / `'\n'` for whitespace control codes). The .gm dialect
+            // never needed escapes historically but loading real-world .g4
+            // grammars (JavaScriptLexer.g4 has `'\''`, `'\\\\'`) requires
+            // them. The escape-aware pattern is backwards compatible: any
+            // literal that matched the old simple `'[^']*'` still matches.
+            lexerTerminals.addTerminal(Constants.STRING,
+                    new RegexString("'(?:\\\\.|[^'\\\\])*'|\"(?:\\\\.|[^\"\\\\])*\""));
             lexerTerminals.addTerminal(Constants.LEXER_GRAMMAR, new RegexString("^lexer\\s+grammar\\b"));
             lexerTerminals.addTerminal(Constants.ANY, Constants.DOT);
             lexerTerminals.addTerminal(Constants.SPECIAL, new RegexString("\\\\(d|D|b|B|S|s|W|w|\\*|\\?|\\+|\\||\\\\)"));
@@ -321,9 +344,9 @@ public class Terminals implements SymbolTypes<Terminal> {
         Optional<Terminal> terminal = this.terminals.stream().filter(t -> !t.name().isEmpty() && (t.name().equals(lexeme.trim()) || t.pattern().equals(lexeme.replace("\"", "").trim()))).findFirst();
         if (terminal.isPresent()) {
             return terminal.get();
-        } else {
-            return null;
         }
+        Terminal aliased = this.nameAliases.get(lexeme.trim());
+        return aliased;
     }
 
     /**
@@ -384,6 +407,18 @@ public class Terminals implements SymbolTypes<Terminal> {
             old = symbolType;
             this.terminals.add(symbolType);
         } else {
+            // Record the displaced name as an alias so parser rules that
+            // still reference it can resolve to the surviving terminal.
+            // `refresh(symbolType)` overwrites old.name with the new
+            // incoming name, so capture the previous name FIRST. The two
+            // cases are symmetric: whichever name is no longer borne by a
+            // live terminal must still be resolvable via the alias map.
+            String displacedName = old.name();
+            String incomingName = symbolType.name();
+            if (!displacedName.equals(incomingName)) {
+                this.nameAliases.put(displacedName, old);
+                this.nameAliases.put(incomingName, old);
+            }
             old.refresh(symbolType);
             this.terminals.remove(old);
             this.terminals.removeIf(t -> t.pattern().equals(symbolType.pattern()));

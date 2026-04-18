@@ -103,8 +103,23 @@ public class G4ToGMConverter {
         // its production body cannot contain a standalone ε alternative
         // either. Grammars that legitimately need an empty branch must
         // hoist it into the caller (e.g. `(row NL)+ → (row NL | NL)+`).
-        result = result.replaceAll("\\|\\s*;", ";");
-        result = result.replaceAll(":\\s*\\|", ":");
+        //
+        // Loop until fixed-point because action-stripping can leave
+        // multiple consecutive empty alternatives ( `| | | ;` in the
+        // JavaScript grammar's `eos` rule, which originally had four
+        // alternatives where three were semantic-predicate-only).
+        String prev;
+        do {
+            prev = result;
+            // `|` followed by optional whitespace then `;` or `)` — trailing empty alt
+            result = result.replaceAll("\\|\\s*;", ";");
+            result = result.replaceAll("\\|\\s*\\)", ")");
+            // `:` or `(` followed by optional whitespace then `|` — leading empty alt
+            result = result.replaceAll(":\\s*\\|", ":");
+            result = result.replaceAll("\\(\\s*\\|", "(");
+            // `| |` — two empty alts in the middle
+            result = result.replaceAll("\\|\\s*\\|", "|");
+        } while (!result.equals(prev));
 
         // Find first parser rule and rename to 'root' if not already
         Pattern firstRulePattern = Pattern.compile(

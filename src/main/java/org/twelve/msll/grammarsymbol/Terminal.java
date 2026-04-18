@@ -72,7 +72,26 @@ public class Terminal extends SymbolType {
     public Pattern compiledPattern() {
         if (compiledPattern == null) {
             String inner = this.isRegex ? this.pattern.trim() : escapeRegex(this.pattern);
-            compiledPattern = Pattern.compile(String.format("(?<%s>%s)", this.tokenName(), inner));
+            try {
+                compiledPattern = Pattern.compile(String.format("(?<%s>%s)", this.tokenName(), inner));
+            } catch (java.util.regex.PatternSyntaxException e) {
+                // A rule's compiled pattern was rejected by Java's regex
+                // engine — typical for real-world G4 grammars that use
+                // constructs Java handles differently (e.g. ANTLR4 allows
+                // unescaped '[' inside a character class). Rather than
+                // crash the entire lexer — which would prevent every OTHER
+                // terminal in the grammar from matching — fall back to a
+                // pattern that never matches. The net effect is that the
+                // particular rule is silently disabled; the rest of the
+                // grammar keeps working. This is a deliberate trade-off
+                // for L4 compatibility: loading is best-effort, parse of
+                // inputs that depend on the disabled rule will fail
+                // predictably.
+                System.err.println("[msll] Disabling terminal '" + this.name
+                        + "' due to regex-compile error: " + e.getMessage());
+                compiledPattern = Pattern.compile(String.format("(?<%s>(?!x)x)",
+                        this.tokenName()));
+            }
         }
         return compiledPattern;
     }
