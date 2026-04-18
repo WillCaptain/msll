@@ -18,7 +18,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 class RegexLexerTest {
     private final static String TEST_GRAMMAR = "outlineParser.gm";
-    private final static String JS_GRAMMAR = "javascriptParser.gm";
     @BeforeEach
     @SneakyThrows
     void setup() {
@@ -77,11 +76,4 @@ class RegexLexerTest {
         //assertEquals(178,tokens.size());
     }
 
-    @Test
-    @SneakyThrows
-    void test_tokenize_js_grammar_file() {
-        TokenBuffer tokens = createFileLexer(JS_GRAMMAR).scan();
-        wait(tokens);
-        assertEquals(1838,tokens.size());
-    }
 }

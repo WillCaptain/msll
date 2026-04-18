@@ -13,7 +13,7 @@ failing grammar to the architectural limitation it exposes.
 
 ## 1. Current matrix
 
-Run on 10 vendored grammars from ANTLR's `grammars-v4` repository (plus
+Run on 11 vendored grammars from ANTLR's `grammars-v4` repository (plus
 two minimal grammars we wrote ourselves to stress specific features).
 
 | Grammar      | Stage | Samples | Notes                                                        |
@@ -28,8 +28,16 @@ two minimal grammars we wrote ourselves to stress specific features).
 | focal        | PARSE | 0/1     | **Limitation L2** — ambiguous maximal munch.                 |
 | properties   | PARSE | 0/1     | **Limitation L3** — no lexer modes.                          |
 | ini          | PARSE | 0/1     | **Limitation L3** — no lexer modes.                          |
+| javascript   | LOAD  | 0/1     | **Limitation L4** — embedded target-language actions.        |
 
-**Summary: 6/10 grammars fully compatible, unmodified.**
+**Summary: 6/11 grammars fully compatible, unmodified.**
+
+The `javascript` row uses the *unmodified, upstream* `JavaScriptLexer.g4`
+and `JavaScriptParser.g4` pulled straight from
+`antlr/grammars-v4/javascript/javascript/`. We include it deliberately
+as a negative result: it is the first grammar in the matrix big enough
+to exercise MSLL's remaining major gap (L4), and keeps us honest about
+what "ANTLR4 compatibility" actually takes.
 
 ## 2. What changed to reach 6/10
 
@@ -112,6 +120,23 @@ seen. Without modes, `KEY : [A-Za-z_][A-Za-z_0-9.\-]*` and
 `host=localhost`), and the first-declared wins, breaking the entry.
 Adding lexer modes is a well-scoped piece of future work (PR-4) but
 reaches well beyond the current PR-1/PR-2/PR-3 fix set.
+
+### L4 — Embedded target-language actions (*javascript*)
+The upstream grammars-v4 `JavaScriptLexer.g4` / `JavaScriptParser.g4`
+interleave the grammar with Java/JavaScript action blocks (`{...}`)
+and semantic predicates (`{expr}?`) — `{this.lineTerminatorAhead()}?`,
+`{this.IsInTemplateString()}?`, `{this.ProcessOpenBrace();}`, etc.
+ANTLR4's *generator* compiles these to runtime code; MSLL is a
+*runtime* interpreter and currently (a) has no target-language
+evaluator wired in and (b) the lift/convert pipeline does not fully
+strip or stub these inline blocks, so an internal token (`||` inside
+an alternative whose predicate got mangled) surfaces back to the
+`.gm` loader. Two paths forward for a future PR-5: (i) treat every
+`{...}` as a no-op at convert time and drop semantic predicates to
+"always true" — sound for parse-shape evaluation, lossy for the
+grammars that actually depend on runtime state; (ii) add a minimal
+predicate stub runtime. Neither is required for the core MSLL claim
+and both are explicitly listed as non-goals of the current paper.
 
 ## 4. Reading the table for the paper
 
