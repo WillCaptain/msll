@@ -99,9 +99,11 @@ public class G4ToGMConverter {
 
         // Drop trailing empty alternatives like "... | ;" or "... |\n;" —
         // ANTLR4 grammars occasionally use them to express an epsilon match,
-        // but MSLL's .gm parser does not accept a bare '|' before ';'.
+        // but MSLL's .gm parser does not accept a bare '|' before ';' and
+        // its production body cannot contain a standalone ε alternative
+        // either. Grammars that legitimately need an empty branch must
+        // hoist it into the caller (e.g. `(row NL)+ → (row NL | NL)+`).
         result = result.replaceAll("\\|\\s*;", ";");
-        // Same for a leading empty alt immediately after ':'.
         result = result.replaceAll(":\\s*\\|", ":");
 
         // Find first parser rule and rename to 'root' if not already

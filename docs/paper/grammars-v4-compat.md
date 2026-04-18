@@ -26,11 +26,11 @@ two minimal grammars we wrote ourselves to stress specific features).
 | pystring     | OK    | 1/1     | Triple-quoted strings spanning multiple physical lines (PR-2). |
 | sexpression  | OK    | 1/1     | Atom/list recursion; char-ranges (PR-3).                     |
 | url          | OK    | 1/1     | The original smoke test.                                     |
-| properties   | PARSE | 0/1     | **Limitation L3** — no lexer modes.                          |
-| ini          | PARSE | 0/1     | **Limitation L3** — no lexer modes.                          |
+| properties   | OK    | 1/1     | Lexer modes (PR-L3); bare seed drops punctuation built-ins.  |
+| ini          | OK    | 1/1     | Lexer modes (PR-L3); sections, blank lines, comments.        |
 | javascript   | LOAD  | 0/1     | **Limitation L4** — embedded target-language actions.        |
 
-**Summary: 8/11 grammars fully compatible, unmodified.**
+**Summary: 10/11 grammars fully compatible, unmodified.**
 
 The `javascript` row uses the *unmodified, upstream* `JavaScriptLexer.g4`
 and `JavaScriptParser.g4` pulled straight from
@@ -173,14 +173,55 @@ user's own `.g4` compete during lexing; nothing from the Outline
 vocabulary leaks in. **Regression test:** `G4LoaderBareTerminalsTest`.
 Focal now parses its vendored sample cleanly.
 
-### L3 — No lexer modes (*properties, ini*)
+### PR-L3: Lexer modes (*properties, ini*)
 Real `.properties` and `.ini` grammars lean on ANTLR4 **lexer modes** to
 flip into a "rest-of-line value" sub-lexer once `=` or `:` has been
 seen. Without modes, `KEY : [A-Za-z_][A-Za-z_0-9.\-]*` and
 `VALUE : ~[\r\n]+` compete for the same prefix (`host` in
-`host=localhost`), and the first-declared wins, breaking the entry.
-Adding lexer modes is a well-scoped piece of future work (PR-4) but
-reaches well beyond the current PR-1/PR-2/PR-3 fix set.
+`host=localhost`), and the first-declared KEY wins, breaking the entry.
+ANTLR4's idiom is `SEP : [=:] -> pushMode(VAL) ;` plus a
+`mode VAL; VALUE : ~[\r\n]+ -> popMode ;` block.
+
+MSLL's lexer-mode *runtime* was already in place (a mode stack on
+`RegexLexer`, per-mode cached terminal arrays on `Terminals`, pushMode/
+popMode/type applied inline), so the remaining work was all on the
+**load path**. Three small gaps were blocking:
+
+1.  **`G4Splitter` silently dropped `mode X;` declarations** — they don't
+    match the rule-head regex (no colon, no body) and were never folded
+    into the lexer half of a combined grammar. Fix: recognise the
+    single-line `mode X;` statement as a pseudo-span, route it to the
+    lexer side, keep source order.
+
+2.  **`Terminals.addSymbol` deduped by pattern across modes.** In a
+    mode-driven grammar two terminals in different modes legitimately
+    share a pattern (DEFAULT's `NL : '\n'` and VAL's
+    `NL_VAL : '\n' -> type(NL), popMode`). The previous dedup collapsed
+    them into one terminal and lost the VAL-mode lexer command. Fix:
+    only dedup when the existing terminal has the *same* mode.
+
+3.  **Bare seed still contained meta-grammar punctuation.**
+    `Terminals.newBare()` (introduced for PR-L2′) still seeded
+    `LEFT_PAREN`, `RIGHT_PAREN`, `COLON`, `SEMICOLON`, `QUESTION`,
+    `STAR`, `OR`, `OR_OR` because the `.gm` meta-grammar consumes them.
+    At runtime they out-competed user-declared tokens sharing a
+    character: properties' `SEP : [=:]` lost to the built-in `COLON` on
+    `author:will`. Fix: strip those punctuation built-ins from the bare
+    seed and keep only `EOL`, `END`, `EPSILON` — the sentinels the MSLL
+    runtime inserts itself.
+
+Two tiny grammar-surface fixes rounded out the picture, both kept
+entirely inside the vendored grammars rather than the engine. ANTLR4's
+bare empty alternative (`row : a | b | ;`) has no direct expression in
+`.gm` (the production body cannot contain a standalone ε) so we hoist
+empty branches into the caller, e.g. `row : section NL | entry NL | NL`.
+This is a local idiom shift, not a MSLL feature change.
+
+**Regression test:** `LexerModeTest` asserts the splitter preserves
+`mode X;`, terminals carry the correct mode and lexer command, and
+parsing a KEY/VALUE grammar with lexically-overlapping identifiers
+succeeds end-to-end. Vendored grammars: `properties.g4`, `ini.g4`
+(both mode-driven, idiomatic ANTLR4).
 
 ### L4 — Embedded target-language actions (*javascript*)
 The upstream grammars-v4 `JavaScriptLexer.g4` / `JavaScriptParser.g4`
@@ -224,4 +265,4 @@ matrix with honest failure attribution, not a cherry-picked 100% score.
   `NoGrammarLeakTest`, `NewlineTokenSynthesisTest`,
   `MultiLineTokenTest`, `LexerFeatureProbeTest`,
   `FirstFollowConflictForkTest` (PR-L1), `LexerRuleInliningTest` (PR-L2),
-  `G4LoaderBareTerminalsTest` (PR-L2′).
+  `G4LoaderBareTerminalsTest` (PR-L2′), `LexerModeTest` (PR-L3).

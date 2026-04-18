@@ -104,7 +104,30 @@ public class Terminals implements SymbolTypes<Terminal> {
      * grammar itself.
      */
     public static Terminals newBare() {
-        return new Terminals();
+        Terminals bare = new Terminals();
+        // The base constructor also seeds a handful of punctuation tokens
+        // (LEFT_PAREN, RIGHT_PAREN, QUESTION, STAR, OR, OR_OR, COLON,
+        // SEMICOLON) because the .gm meta-grammar parser itself consumes
+        // them. In a user grammar loaded via G4 those characters are
+        // whatever the user declares they are — COLON out-competing a
+        // user-declared `SEP : [=:]` token is exactly the kind of
+        // cross-contamination the bare seed is meant to prevent. Strip
+        // them here; keep only EOL / END / EPSILON, which the MSLL
+        // runtime itself inserts as sentinels during lexing.
+        bare.terminals.removeIf(t -> {
+            String n = t.name();
+            return n.equals(Constants.LEFT_PAREN_STR)
+                || n.equals(Constants.RIGHT_PAREN_STR)
+                || n.equals(Constants.QUESTION_STR)
+                || n.equals(Constants.STAR_STR)
+                || n.equals(Constants.OR_OR_STR)
+                || n.equals(Constants.OR_STR)
+                || n.equals(Constants.COLON_STR)
+                || n.equals(Constants.SEMICOLON_STR);
+        });
+        bare.cachedTerminalArray = null;
+        bare.modeTerminalCache.clear();
+        return bare;
     }
 
     private static Terminals buildMyTerminals() {
@@ -346,7 +369,16 @@ public class Terminals implements SymbolTypes<Terminal> {
     public Terminal addSymbol(Terminal symbolType) {
         Terminal old = this.fromName(symbolType.name());
         if (old == null) {
-            old = this.fromPattern(symbolType.pattern());
+            // Only dedup by pattern when the new terminal lives in the same
+            // lexer mode as an existing one. With lexer modes it is legitimate
+            // for two differently-named rules in different modes to share a
+            // pattern (e.g. DEFAULT's `NL : '\n'` and VAL's
+            // `NL_VAL : '\n' -> type(NL), popMode`). Collapsing them loses
+            // the mode-specific rule and its lexer command.
+            Terminal byPattern = this.fromPattern(symbolType.pattern());
+            if (byPattern != null && java.util.Objects.equals(byPattern.mode(), symbolType.mode())) {
+                old = byPattern;
+            }
         }
         if (old == null) {
             old = symbolType;

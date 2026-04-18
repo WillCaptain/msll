@@ -60,6 +60,18 @@ public final class G4Splitter {
                     + ":");
 
     /**
+     * Matches ANTLR4 lexer-mode switch declarations such as {@code mode VALUE;}
+     * that may appear between lexer rules. These are not rules (no colon, no
+     * body) but they partition subsequent lexer rules into named modes; the
+     * splitter must preserve them so the lexer half still carries the mode
+     * boundaries MSLL's {@link org.twelve.msll.parsetree.LexerRuleTree}
+     * relies on. Only recognised at the start of a line to stay out of rule
+     * bodies.
+     */
+    private static final Pattern MODE_DECL = Pattern.compile(
+            "(?m)^\\s*mode\\s+[A-Za-z_][A-Za-z_0-9]*\\s*;");
+
+    /**
      * Splits {@code src} into lexer / parser halves.
      *
      * @param src raw contents of a {@code .g4} file
@@ -111,7 +123,7 @@ public final class G4Splitter {
         for (int i = 0; i < ruleSpans.size(); i++) {
             int[] span = ruleSpans.get(i);
             String ruleText = body.substring(span[0], span[1]);
-            if (isLexerRule(ruleText)) {
+            if (isModeDecl(ruleText) || isLexerRule(ruleText)) {
                 lexerRules.append(ruleText);
                 if (!ruleText.endsWith("\n")) lexerRules.append('\n');
             } else {
@@ -148,7 +160,26 @@ public final class G4Splitter {
             if (end < 0) break;
             spans.add(new int[]{start, end});
         }
+        // Mode declarations are single-statement lines (mode X;) that sit
+        // between lexer rules. They don't match RULE_HEAD (no colon/body)
+        // so we collect them separately and merge in position order so the
+        // final span list stays sorted.
+        Matcher md = MODE_DECL.matcher(body);
+        while (md.find()) {
+            spans.add(new int[]{md.start(), md.end()});
+        }
+        spans.sort((a, b) -> Integer.compare(a[0], b[0]));
         return spans;
+    }
+
+    /**
+     * True if the span's first non-whitespace characters are {@code mode }.
+     * Mode declarations belong to the lexer half unconditionally.
+     */
+    private static boolean isModeDecl(String ruleText) {
+        int i = 0, n = ruleText.length();
+        while (i < n && Character.isWhitespace(ruleText.charAt(i))) i++;
+        return ruleText.startsWith("mode ", i) || ruleText.startsWith("mode\t", i);
     }
 
     /** Scans forward from {@code from} until the terminating {@code ;} at depth 0. */
