@@ -83,10 +83,9 @@ public class LexerRuleInliningTest {
     // --- helpers ---
 
     private static Terminals terminalsFor(String combinedG4) throws Exception {
-        G4GrammarLoader.Loaded loaded = G4GrammarLoader.loadG4String(null, combinedG4);
-        Field tf = loaded.builder.getClass().getSuperclass().getDeclaredField("terminals");
-        tf.setAccessible(true);
-        return (Terminals) tf.get(loaded.builder);
+        // Bare loader path; Terminals/NonTerminals exposed via the public accessor
+        // on ParserBuilder (the bare builder uses Terminals.newBare()).
+        return G4GrammarLoader.loadG4String(null, combinedG4).builder.terminals();
     }
 
     @SuppressWarnings("unchecked")

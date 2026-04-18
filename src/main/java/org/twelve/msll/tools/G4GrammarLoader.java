@@ -1,6 +1,6 @@
 package org.twelve.msll.tools;
 
-import org.twelve.msll.parserbuilder.MyParserBuilder;
+import org.twelve.msll.parserbuilder.MsllParserBuilder;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -42,12 +42,17 @@ public final class G4GrammarLoader {
      * this to dump to {@code target/gm-dump/...}.
      */
     public static final class Loaded {
-        public final MyParserBuilder builder;
+        /**
+         * Bare runtime builder &mdash; no Outline-language tokens are seeded,
+         * so terminals declared in the user grammar's {@code .g4} are the only
+         * ones that compete during lexing. See {@link MsllParserBuilder}.
+         */
+        public final MsllParserBuilder builder;
         public final String lexerGm;
         public final String parserGm;
         public final int liftedCount;
 
-        Loaded(MyParserBuilder builder, String lexerGm, String parserGm, int liftedCount) {
+        Loaded(MsllParserBuilder builder, String lexerGm, String parserGm, int liftedCount) {
             this.builder = builder;
             this.lexerGm = lexerGm;
             this.parserGm = parserGm;
@@ -101,7 +106,10 @@ public final class G4GrammarLoader {
         String lexerGm = G4ToGMConverter.convert(lifted.lexer, true);
         String parserGm = G4ToGMConverter.convert(lifted.parser, false);
 
-        MyParserBuilder builder = new MyParserBuilder(
+        // Bare seeds: Terminals.newBare() so no Outline built-in tokens (STRING,
+        // ++, ==, COMMA, etc.) sneak into the user grammar's terminal table and
+        // out-compete the user's own lexer rules during maximal-munch matching.
+        MsllParserBuilder builder = new MsllParserBuilder(
                 new StringReader(parserGm), new StringReader(lexerGm));
         // Flip on ANTLR4-style conflict handling: any FIRST/FOLLOW cell that the
         // predict table detected as conflicted will fork the parse stack between

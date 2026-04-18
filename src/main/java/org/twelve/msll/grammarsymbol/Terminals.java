@@ -88,6 +88,25 @@ public class Terminals implements SymbolTypes<Terminal> {
         return buildMyTerminals();
     }
 
+    /**
+     * Returns a <em>fresh</em>, <em>minimal</em> {@code Terminals} instance
+     * containing only the structural built-ins seeded by the constructor
+     * ({@code (}, {@code )}, {@code ?}, {@code *}, {@code |}, {@code :},
+     * {@code ;}, {@code END}, {@code EOL}, {@code EPSILON}). It does
+     * <em>not</em> add any Outline-language tokens (no {@code STRING},
+     * {@code ++}, {@code ==}, {@code COMMA}, {@code DOT}, etc.).
+     *
+     * <p>This is the seed used by the G4 loading path so that built-in
+     * Outline tokens do not pollute a user grammar's terminal table and
+     * compete with terminals declared in the user's own {@code .g4}
+     * (e.g. focal's {@code STRING_LITERAL} losing to MSLL's built-in
+     * {@code STRING}). Any token a G4 grammar needs must come from the
+     * grammar itself.
+     */
+    public static Terminals newBare() {
+        return new Terminals();
+    }
+
     private static Terminals buildMyTerminals() {
         Terminals myTerminals = new Terminals();
             // Support escape sequences (e.g. \n, \t, \") inside string literals

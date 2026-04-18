@@ -21,16 +21,16 @@ two minimal grammars we wrote ourselves to stress specific features).
 | abnf         | OK    | 1/1     | FIRST/FOLLOW auto-fork (PR-L1); previously failed on L1.     |
 | calculator   | OK    | 2/2     | Float, scientific notation; char-ranges `'0'..'9'` (PR-3).   |
 | csv          | OK    | 1/1     | Newlines are real tokens (PR-1).                             |
+| focal        | OK    | 1/1     | Cross-rule inlining (PR-L2); bare G4 seed (PR-L2′).          |
 | json         | OK    | 2/2     | Nested objects/arrays, fragments, Unicode escapes.           |
 | pystring     | OK    | 1/1     | Triple-quoted strings spanning multiple physical lines (PR-2). |
 | sexpression  | OK    | 1/1     | Atom/list recursion; char-ranges (PR-3).                     |
 | url          | OK    | 1/1     | The original smoke test.                                     |
-| focal        | PARSE | 0/1     | **Residual L2′** — built-in STRING terminal conflict.        |
 | properties   | PARSE | 0/1     | **Limitation L3** — no lexer modes.                          |
 | ini          | PARSE | 0/1     | **Limitation L3** — no lexer modes.                          |
 | javascript   | LOAD  | 0/1     | **Limitation L4** — embedded target-language actions.        |
 
-**Summary: 7/11 grammars fully compatible, unmodified.**
+**Summary: 8/11 grammars fully compatible, unmodified.**
 
 The `javascript` row uses the *unmodified, upstream* `JavaScriptLexer.g4`
 and `JavaScriptParser.g4` pulled straight from
@@ -151,13 +151,27 @@ that could fire. PR-L2 makes every lexer rule inlineable, resolves
 forward references by fixed-point iteration, and focal's numeric rules
 parse correctly.
 
-*Residual L2′.* Focal still fails at the vendored sample, but one token
-later and for a different reason: MyParser installs a built-in
-`STRING` terminal (`"..."`) for Outline-style languages, and that
-terminal out-competes focal's own `STRING_LITERAL`. This is a
-cross-contamination between MSLL's built-in lexer seed and G4-loaded
-grammars, not a lexer-tie-breaking limitation; fixing it is scoped as
-a follow-up.
+### PR-L2′: Bare terminal seeds on the G4 loading path (*focal*)
+After PR-L2 focal progressed one token further and then tripped on a
+*different* cross-contamination: `MyParserBuilder` seeded every user
+grammar's terminal table via `Terminals.newMy()`, which registers
+~25 Outline-language built-ins (`STRING`, `++`, `==`, `COMMA`, `DOT`,
+...). Focal's own `STRING_LITERAL : '"' .*? '"'` had the same
+maximal-munch length as the built-in `STRING` on `"HELLO"` and lost
+the tie because the built-in was registered first. The token arriving
+at the parser was `STRING`, which focal's rules (expecting
+`STRING_LITERAL`) did not recognise.
+
+*Fix.* Split the builder hierarchy. `MsllParserBuilder` is a
+grammar-agnostic bare builder that seeds with `Terminals.newBare()`
+&mdash; only the structural built-ins (parens, alternation,
+END/EOL/EPSILON) the MSLL runtime itself needs. `MyParserBuilder`
+now extends it and layers the Outline token vocabulary on top, so
+Outline callers keep their existing behaviour unchanged. The G4
+loader switches to the bare builder. Only tokens declared in the
+user's own `.g4` compete during lexing; nothing from the Outline
+vocabulary leaks in. **Regression test:** `G4LoaderBareTerminalsTest`.
+Focal now parses its vendored sample cleanly.
 
 ### L3 — No lexer modes (*properties, ini*)
 Real `.properties` and `.ini` grammars lean on ANTLR4 **lexer modes** to
@@ -209,4 +223,5 @@ matrix with honest failure attribution, not a cherry-picked 100% score.
 - Probe-level regressions for each PR live next to the harness:
   `NoGrammarLeakTest`, `NewlineTokenSynthesisTest`,
   `MultiLineTokenTest`, `LexerFeatureProbeTest`,
-  `FirstFollowConflictForkTest` (PR-L1), `LexerRuleInliningTest` (PR-L2).
+  `FirstFollowConflictForkTest` (PR-L1), `LexerRuleInliningTest` (PR-L2),
+  `G4LoaderBareTerminalsTest` (PR-L2′).
