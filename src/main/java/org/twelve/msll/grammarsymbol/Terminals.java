@@ -378,6 +378,20 @@ public class Terminals implements SymbolTypes<Terminal> {
         return null;
     }
 
+    /**
+     * Treat {@code null} (built-in seeded terminals carry no mode) and
+     * {@code "DEFAULT_MODE"} (assigned to every G4-loaded rule sitting before
+     * any {@code mode X;} declaration) as the same mode for dedup purposes.
+     * Without this, a grammar-loaded {@code Dot : '.'} (mode="DEFAULT_MODE")
+     * fails to merge with the seeded {@code DOT} (mode=null) and the parser
+     * predict table ends up keyed on the unreachable name.
+     */
+    private static boolean sameMode(String a, String b) {
+        String na = (a == null) ? "DEFAULT_MODE" : a;
+        String nb = (b == null) ? "DEFAULT_MODE" : b;
+        return na.equals(nb);
+    }
+
     public Terminal fromPattern(String pattern) {
         if (pattern == null || pattern.trim() == Constants.EMPTY) return null;
         Optional<Terminal> terminal = this.terminals.stream().filter(t -> t.pattern().equals(pattern.trim()) || t.pattern().equals(pattern.replace("\"", "").trim())).findFirst();
@@ -399,7 +413,7 @@ public class Terminals implements SymbolTypes<Terminal> {
             // `NL_VAL : '\n' -> type(NL), popMode`). Collapsing them loses
             // the mode-specific rule and its lexer command.
             Terminal byPattern = this.fromPattern(symbolType.pattern());
-            if (byPattern != null && java.util.Objects.equals(byPattern.mode(), symbolType.mode())) {
+            if (byPattern != null && sameMode(byPattern.mode(), symbolType.mode())) {
                 old = byPattern;
             }
         }
