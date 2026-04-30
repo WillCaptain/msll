@@ -55,6 +55,19 @@ public class MsllStack extends Stack<ParseNode> {
     private Map<ParseNode, GrammarAmbiguity> parentBatches = new HashMap<>();
 
     /**
+     * Number of input tokens this stack has consumed. Used by the longest-match
+     * priority resolver in {@link GrammarAmbiguity}: when two live stacks reach
+     * the same checkpoint, the one that has consumed more tokens wins; on a
+     * tie, grammar-order wins (i.e. the first arriver). Reset together with
+     * the stack when it is freed back to the pool.
+     */
+    private int tokensConsumed = 0;
+
+    public int tokensConsumed() { return tokensConsumed; }
+
+    public void incrementTokensConsumed() { this.tokensConsumed++; }
+
+    /**
      * Applies and returns an available stack, optionally copying a parent stack if provided.
      * <p>
      * This method either reuses an available (unoccupied) stack or creates a new one if none are available.
@@ -77,10 +90,13 @@ public class MsllStack extends Stack<ParseNode> {
             s.flag = new Flag(parent.flag);
             s.addAll(parent);
             s.parentBatches = parent.batches();
+            // Forked stack inherits the parent's consumed-token count so the
+            // longest-match resolver compares both stacks fairly.
+            s.tokensConsumed = parent.tokensConsumed;
         } else {
             s.flag = new Flag(null);
-            // Reset parentBatches so stale entries from previous use never pollute a fresh stack.
             if (!s.parentBatches.isEmpty()) s.parentBatches = new HashMap<>();
+            s.tokensConsumed = 0;
         }
         return s;
     }
@@ -124,6 +140,7 @@ public class MsllStack extends Stack<ParseNode> {
         this.occupied = false;
         this.clear();
         this.batches.clear();
+        this.tokensConsumed = 0;
         freePool.offer(this);
     }
 

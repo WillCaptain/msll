@@ -249,14 +249,25 @@ public abstract class MsllParser<P extends ParserTree> {
                     parseToken(tokens, cursor, more, lineIndex);
                 } else {
                     matchTerminalToken(stack, cast(node), token, tokens.getLine(token.location().line().number()));
+                    // Successfully consumed a terminal token: bump the
+                    // longest-match counter used by GrammarAmbiguity to
+                    // resolve competing live stacks.
+                    stack.incrementTokensConsumed();
                     if (token.terminal() == terminals.END && stack.size() == 0) {
-                        if(this.status == PARSE_STATUS.DONE){
-                            this.status = PARSE_STATUS.AMBIGUOUS;
+                        // Stacks marked expired by longest-match resolution
+                        // (GrammarAmbiguity) are not real second completions –
+                        // they are losing alternatives kept alive only because
+                        // the parser does not eagerly skip expired stacks.
+                        // Ignore them in the end-of-input ambiguity check.
+                        if (!stack.flag().expired()) {
+                            if(this.status == PARSE_STATUS.DONE){
+                                this.status = PARSE_STATUS.AMBIGUOUS;
+                            }
+                            if(this.status == PARSE_STATUS.RUNNING){
+                               this.status = PARSE_STATUS.DONE;
+                               lineIndex.set(cursor);
+                           }
                         }
-                        if(this.status == PARSE_STATUS.RUNNING){
-                           this.status = PARSE_STATUS.DONE;
-                           lineIndex.set(cursor);
-                       }
                     }
                 }
             } catch (GrammarSyntaxException e) {
