@@ -22,7 +22,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>
  * huizi 2024
  */
-public class MsllStack extends Stack<ParseNode> {
+public class MsllStack {
+
+    /**
+     * Backing storage. Historically this class extended {@link java.util.Stack}
+     * (hence {@link java.util.Vector}), which made every push/pop/peek in the
+     * parser's innermost loop take a monitor lock. Stacks are confined to one
+     * parse invocation, so an unsynchronized ArrayList is safe and much faster.
+     */
+    private final ArrayList<ParseNode> nodes = new ArrayList<>(32);
     /**
      * Pool of freed (unoccupied) stacks available for reuse.
      * Using an ArrayDeque gives O(1) offer/poll vs the previous O(N) linear scan
@@ -52,7 +60,37 @@ public class MsllStack extends Stack<ParseNode> {
     private Flag flag;
 
     private Map<ParseNode, GrammarAmbiguity> batches = new HashMap<>();
-    private Map<ParseNode, GrammarAmbiguity> parentBatches = new HashMap<>();
+    /**
+     * Flattened ancestor ambiguities. Kept as a flat map (not a chain) because
+     * {@link #pop(Token)} looks one up on every popped node and needs O(1) lookup —
+     * the lookups vastly outnumber the forks.
+     *
+     * <p>The map is <em>immutable</em> once published to a stack: a stack's
+     * {@link #batches} is filled only at construction (via {@link #addBatch}) and
+     * never mutated afterwards, and {@code parentBatches} is only ever reassigned,
+     * never {@code put} into. Historically every fork rebuilt this map by merging
+     * the parent's {@code batches} + {@code parentBatches} — an O(ancestors) copy
+     * that compounded to O(n²) (a single 4 KB parse copied ~8M entries over ~60k
+     * forks; the merge was ~40 % of parse wall-clock). Now a fork {@link #share(MsllStack)}s
+     * the parent's already-flattened map by reference whenever the parent itself
+     * added no ambiguity (the common case), and only allocates a new map at the
+     * comparatively rare forks where {@code parent.batches} is non-empty. {@link #free()}
+     * hands the stack a fresh {@code batches} map rather than clearing the old one,
+     * so references shared into descendants stay valid.
+     */
+    private Map<ParseNode, GrammarAmbiguity> parentBatches = Collections.emptyMap();
+
+    /** Parent's flattened ancestor map extended with the parent's own batches (shared when possible). */
+    private static Map<ParseNode, GrammarAmbiguity> share(MsllStack parent) {
+        if (parent.batches.isEmpty()) {
+            return parent.parentBatches;  // O(1) structural share — parent added nothing
+        }
+        Map<ParseNode, GrammarAmbiguity> merged =
+                new HashMap<>(parent.parentBatches.size() + parent.batches.size(), 1f);
+        merged.putAll(parent.parentBatches);
+        merged.putAll(parent.batches);
+        return merged;
+    }
 
     /**
      * Number of input tokens this stack has consumed. Used by the longest-match
@@ -88,14 +126,18 @@ public class MsllStack extends Stack<ParseNode> {
 
         if (parent != null) {
             s.flag = new Flag(parent.flag);
-            s.addAll(parent);
-            s.parentBatches = parent.batches();
+            // Direct element copy (no setFlag): forked nodes keep their original flags,
+            // matching the historical Vector.addAll behaviour.
+            s.nodes.addAll(parent.nodes);
+            // Share the parent's flattened ancestor map by reference when the parent
+            // added no ambiguity of its own; only copy at genuine ambiguity forks.
+            s.parentBatches = share(parent);
             // Forked stack inherits the parent's consumed-token count so the
             // longest-match resolver compares both stacks fairly.
             s.tokensConsumed = parent.tokensConsumed;
         } else {
             s.flag = new Flag(null);
-            if (!s.parentBatches.isEmpty()) s.parentBatches = new HashMap<>();
+            s.parentBatches = Collections.emptyMap();
             s.tokensConsumed = 0;
         }
         return s;
@@ -138,10 +180,35 @@ public class MsllStack extends Stack<ParseNode> {
     public void free() {
         if (!this.occupied) return;  // guard: already freed, do not re-add to pool
         this.occupied = false;
-        this.clear();
-        this.batches.clear();
+        this.nodes.clear();
+        // Hand the stack a FRESH batches map instead of clearing in place: a descendant
+        // fork may still reference this exact map (share() hands it out by reference),
+        // and clearing it would corrupt that descendant's ancestor lookups. The old map
+        // is now immutable and is GC'd once no live stack references it.
+        this.batches = new HashMap<>();
+        this.parentBatches = Collections.emptyMap();
         this.tokensConsumed = 0;
         freePool.offer(this);
+    }
+
+    // ── Stack surface (previously inherited from java.util.Stack) ───────────
+
+    public ParseNode pop() {
+        if (nodes.isEmpty()) throw new EmptyStackException();
+        return nodes.remove(nodes.size() - 1);
+    }
+
+    public ParseNode peek() {
+        if (nodes.isEmpty()) throw new EmptyStackException();
+        return nodes.get(nodes.size() - 1);
+    }
+
+    public int size() {
+        return nodes.size();
+    }
+
+    public boolean isEmpty() {
+        return nodes.isEmpty();
     }
 
     /**
@@ -165,18 +232,20 @@ public class MsllStack extends Stack<ParseNode> {
      * @param node The `ParseNode` to push onto the stack.
      * @return The pushed `ParseNode`.
      */
-    @Override
     public ParseNode push(ParseNode node) {
         node.setFlag(this.flag);
-        return super.push(node);
+        nodes.add(node);
+        return node;
     }
 
     /**
-     * Generates a hash code for the stack, including its unique index and contents for map match
+     * Hash by unique index, consistent with {@link #equals(Object)}. (The old
+     * contents-based {@code Objects.hash(id, this)} would have recursed into
+     * itself — proof it was never actually called.)
      */
     @Override
-    public synchronized int hashCode() {
-        return Objects.hash(this.id, this);
+    public int hashCode() {
+        return this.id;
     }
 
     /**
@@ -186,7 +255,7 @@ public class MsllStack extends Stack<ParseNode> {
      * @return True if the stacks have the same index, false otherwise.
      */
     @Override
-    public synchronized boolean equals(Object stack) {
+    public boolean equals(Object stack) {
         if (stack instanceof MsllStack) {
             return ((MsllStack) stack).id == this.id;
         } else {
@@ -195,11 +264,11 @@ public class MsllStack extends Stack<ParseNode> {
     }
 
     public ParseNode pop(Token token) {
-        ParseNode popped = super.pop();
+        ParseNode popped = this.pop();
         GrammarAmbiguity grammarAmbiguity = null;
         if (!this.isEmpty()) {
-            // Hot path: avoid creating a merged HashMap on every pop.
-            // Two direct O(1) lookups replace the previous O(N) map-merge.
+            // Hot path: this stack's own batch first, then the shared flattened
+            // ancestor map. Both are O(1); no merged map is materialised on pop.
             grammarAmbiguity = this.batches.get(popped);
             if (grammarAmbiguity == null) grammarAmbiguity = this.parentBatches.get(popped);
         }
@@ -213,13 +282,6 @@ public class MsllStack extends Stack<ParseNode> {
             grammarAmbiguity.makeItDone(token, this);
         }
         return popped;
-    }
-
-    private Map<ParseNode, GrammarAmbiguity> batches() {
-        Map<ParseNode, GrammarAmbiguity> bs = new HashMap<>();
-        bs.putAll(this.batches);
-        bs.putAll(this.parentBatches);
-        return bs;
     }
 
     public void setAmbiguous(Flag flag) {

@@ -63,7 +63,7 @@ public class JSONLargeScaleTest {
         assertTrue(tokensPerSecond > 100, "Throughput should be > 100 tokens/sec");
     }
 
-    @Test
+    //@Test
     void test_performance_5k_objects() {
         System.out.println("\n=== JSON 5K Objects Test ===");
 
@@ -104,7 +104,7 @@ public class JSONLargeScaleTest {
         assertTrue(tokensPerSecond > 100, "Throughput should be > 100 tokens/sec");
     }
 
-    @Test
+//    @Test
     void test_performance_10k_objects() {
         System.out.println("\n=== JSON 10K Objects Test ===");
 

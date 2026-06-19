@@ -19,7 +19,7 @@ public class GrammarAmbiguity {
 
     public GrammarAmbiguity(MsllStack stack) {
         this.id = counter.incrementAndGet();
-        this.checkNode = stack.getLast();
+        this.checkNode = stack.peek();
         this.flag = stack.flag();
     }
 

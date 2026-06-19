@@ -228,8 +228,7 @@ public abstract class MsllParser<P extends ParserTree> {
             return;
         }
 
-        List<MsllStack> all = new ArrayList<>();
-        all.addAll(stackList);
+        List<MsllStack> all = new ArrayList<>(stackList);
         for (MsllStack stack : all) {
             //check predicate
             checkPredicate(tokens, token, stack);
@@ -347,12 +346,9 @@ public abstract class MsllParser<P extends ParserTree> {
         boolean epsilonAlongside = (epsilonTerminals != null
                 && epsilonTerminals.contains(token.terminal().name()))
                 || this.predictTable.hasEpsilonAlongside(grammar.name(), token.terminal().name());
-        List<Production> productions = this.predictTable.match(token, grammar, line).stream()
-                .filter(p -> p != null && (epsilonAlongside || !p.isEmpty()))
-                .collect(Collectors.toList());
-        if (epsilonAlongside) {
-            productions.sort((a, b) -> a.isEmpty() == b.isEmpty() ? 0 : (a.isEmpty() ? -1 : 1));
-        }
+        // Pre-filtered per-cell list (nulls/ε handled, ε-first pre-sorted) — see
+        // PredictTable.matchFiltered. The list is cached and unmodifiable.
+        List<Production> productions = this.predictTable.matchFiltered(token, grammar, line, epsilonAlongside);
         List<MsllStack> all = new ArrayList<>();
         all.add(stack);
         if (productions.size() == 0) {
@@ -362,7 +358,8 @@ public abstract class MsllParser<P extends ParserTree> {
         if (productions.size() > 1) {
             grammarAmbiguity = new GrammarAmbiguity(stack);
             for (int j = 0; j < productions.size(); j++) {
-                MsllStack matched = MsllStack.apply(stack, grammarAmbiguity, grammar.name() + ":" + productions.get(j).toString());
+                // Label is a write-only debug field — never pay Production.toString() here.
+                MsllStack matched = MsllStack.apply(stack, grammarAmbiguity, grammar.name());
                 this.stacks.add(matched);
                 all.add(matched);
             }
@@ -467,12 +464,21 @@ public abstract class MsllParser<P extends ParserTree> {
         this.status = PARSE_STATUS.RUNNING;
         TokenBuffer tokens = lexer().scan();
         List<GrammarSyntaxException> collectedErrors = new ArrayList<>();
-        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+        // The loop runs inline on the caller's thread: the old
+        // CompletableFuture.runAsync + future.get() wrapper added a ForkJoin
+        // common-pool hop per parse (latency + contention with concurrent
+        // editor requests) for a strictly synchronous result.
+        try {
             AtomicInteger lineIndex = new AtomicInteger(-1);
-            AtomicInteger cursor = new AtomicInteger(0);
-            while (cursor.get() == 0 || cursor.get() < tokens.size() || !tokens.get(tokens.size() - 1).terminal().name().equals(Constants.END_STR)) {
+            // Hoisted: the token buffer is complete after scan(), so whether it
+            // ends with END never changes mid-loop (the old loop re-read and
+            // string-compared the last token's terminal name every iteration).
+            boolean endsWithEnd = tokens.size() > 0
+                    && tokens.get(tokens.size() - 1).terminal().name().equals(Constants.END_STR);
+            int cursor = 0;
+            while (cursor == 0 || cursor < tokens.size() || !endsWithEnd) {
                 try {
-                    this.parseToken(tokens, cursor.getAndIncrement(), this.stacks, lineIndex);
+                    this.parseToken(tokens, cursor++, this.stacks, lineIndex);
                 } catch (GrammarSyntaxException e) {
                     // Panic-mode recovery: collect this error and try to resume
                     // at the next statement boundary if the subclass supports it.
@@ -480,7 +486,7 @@ public abstract class MsllParser<P extends ParserTree> {
                     if (recoverySymbol != null && this.stacks.isEmpty()) {
                         collectedErrors.add(e);
                         // Advance past the next ';' (statement terminator)
-                        int pos = cursor.get();
+                        int pos = cursor;
                         while (pos < tokens.size()) {
                             Token t = tokens.get(pos++);
                             if (t != null && t.terminal() != null
@@ -489,7 +495,7 @@ public abstract class MsllParser<P extends ParserTree> {
                                 break;
                             }
                         }
-                        cursor.set(pos);
+                        cursor = pos;
                         // Rebuild stacks so we can parse the next statement
                         if (!rebuildStacksForRecovery(recoverySymbol)) {
                             throw e; // can't recover – propagate original error
@@ -504,20 +510,16 @@ public abstract class MsllParser<P extends ParserTree> {
             if (!collectedErrors.isEmpty()) {
                 throw new AggregateGrammarSyntaxException(collectedErrors);
             }
-        });
-        try {
-            future.get();
-        } catch (Exception e) {
+        } catch (AggregateGrammarSyntaxException agg) {
             // Always reset the static MsllStack pool so that a failed parse does not
             // leave stale entries that corrupt subsequent parse() calls.
             MsllStack.reset();
-            Throwable cause = e.getCause();
-            if (cause instanceof AggregateGrammarSyntaxException agg) {
-                throw agg;
-            }
-            if (cause instanceof GrammarSyntaxException gse) {
-                throw gse;
-            }
+            throw agg;
+        } catch (GrammarSyntaxException gse) {
+            MsllStack.reset();
+            throw gse;
+        } catch (Exception e) {
+            MsllStack.reset();
             throw new GrammarSyntaxException("parsing error: " + e.getMessage());
         }
         this.syntaxErrors = java.util.Collections.emptyList();

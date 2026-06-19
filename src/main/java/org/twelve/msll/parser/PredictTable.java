@@ -47,6 +47,22 @@ public class PredictTable {
     private final Map<String, Set<String>> epsilonAlongsideCells = new HashMap<>();
 
     /**
+     * Per-cell production lists pre-filtered for the two runtime regimes,
+     * computed once at construction (the table is immutable afterwards and is
+     * shared across threads by parser builders):
+     * <ul>
+     *   <li>{@link #nonEmptyCells} — nulls and &epsilon; productions removed
+     *       (the default regime in {@code matchNonTerminalToken});</li>
+     *   <li>{@link #epsilonFirstCells} — nulls removed, &epsilon; productions
+     *       stably sorted first (the epsilon-alongside conflict regime).</li>
+     * </ul>
+     * Replaces a per-expansion stream filter + collect + sort in the parser's
+     * hottest loop. Lists are unmodifiable; callers must not mutate them.
+     */
+    private final Map<Terminal, Map<Grammar, List<Production>>> nonEmptyCells = new HashMap<>();
+    private final Map<Terminal, Map<Grammar, List<Production>>> epsilonFirstCells = new HashMap<>();
+
+    /**
      * When {@code false} (default), {@link #hasEpsilonAlongside} always returns
      * {@code false} and the parser relies solely on the hand-curated whitelist
      * in {@link MsllParser#epsilonAlongsideGrammars}. This preserves byte-exact
@@ -81,6 +97,7 @@ public class PredictTable {
             }
         });
         detectConflicts();
+        precomputeFilteredCells();
     }
 
     /**
@@ -141,6 +158,51 @@ public class PredictTable {
      */
     public Map<String, Set<String>> autoEpsilonAlongsideCells() {
         return epsilonAlongsideCells;
+    }
+
+    /** Builds {@link #nonEmptyCells} / {@link #epsilonFirstCells} from the finished table. */
+    private void precomputeFilteredCells() {
+        for (Map.Entry<Terminal, Map<Grammar, List<Production>>> byTerm : table.entrySet()) {
+            Map<Grammar, List<Production>> nonEmptyByGrammar = new HashMap<>();
+            Map<Grammar, List<Production>> epsilonFirstByGrammar = new HashMap<>();
+            for (Map.Entry<Grammar, List<Production>> cell : byTerm.getValue().entrySet()) {
+                nonEmptyByGrammar.put(cell.getKey(),
+                        java.util.Collections.unmodifiableList(filterCell(cell.getValue(), false)));
+                epsilonFirstByGrammar.put(cell.getKey(),
+                        java.util.Collections.unmodifiableList(filterCell(cell.getValue(), true)));
+            }
+            nonEmptyCells.put(byTerm.getKey(), nonEmptyByGrammar);
+            epsilonFirstCells.put(byTerm.getKey(), epsilonFirstByGrammar);
+        }
+    }
+
+    /** Mirror of the historical runtime filter: drop nulls; drop ε unless kept-alongside (then sort ε first, stable). */
+    private static List<Production> filterCell(List<Production> raw, boolean epsilonAlongside) {
+        List<Production> out = new ArrayList<>(raw.size());
+        for (Production p : raw) {
+            if (p == null) continue;
+            if (!epsilonAlongside && p.isEmpty()) continue;
+            out.add(p);
+        }
+        if (epsilonAlongside) {
+            out.sort((a, b) -> a.isEmpty() == b.isEmpty() ? 0 : (a.isEmpty() ? -1 : 1));
+        }
+        return out;
+    }
+
+    /**
+     * {@link #match(Token, Grammar, String)} plus the runtime production filter,
+     * served from the per-cell caches with zero allocation. {@code epsilonAlongside}
+     * selects the conflict regime (keep ε productions, ε first). Falls back to
+     * {@code match()} on a missing cell so error reporting is unchanged.
+     */
+    public List<Production> matchFiltered(Token token, Grammar grammar, String line, boolean epsilonAlongside) {
+        Map<Grammar, List<Production>> byGrammar =
+                (epsilonAlongside ? epsilonFirstCells : nonEmptyCells).get(token.terminal());
+        List<Production> cached = byGrammar == null ? null : byGrammar.get(grammar);
+        if (cached != null) return cached;
+        // Missing cell: match() raises the canonical grammar error.
+        return filterCell(match(token, grammar, line), epsilonAlongside);
     }
 
     /**

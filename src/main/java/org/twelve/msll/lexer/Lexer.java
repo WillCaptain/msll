@@ -7,13 +7,12 @@ import org.twelve.msll.util.CommandCall;
 import org.twelve.msll.util.Constants;
 
 import java.io.Reader;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
  * lexer
  * parse source code to tokens for the next parser step
- * lexer will output a token stream and asyncally emitting token to parser
+ * lexer emits tokens into a {@link TokenBuffer} for the parser
  *
  * @author huizi 2024
  */
@@ -42,35 +41,40 @@ public abstract class Lexer {
 
     public TokenBuffer scan() {
         TokenBuffer buffer = new TokenBuffer(this.codeCache);
-        CompletableFuture.runAsync(() -> {
-            StringBuilder line = new StringBuilder();
-            char ch = ' ';
-            int _ch;
-            while (true) {
-                _ch = read(reader);
-                if (eolOrEof(_ch)) {
-                    if (eolOrEof(ch) && _ch != Constants.EOF && ch != (char) _ch) continue;
-                    ch = (char) _ch;
-                    lineIndex = this.codeCache.addLine(line.toString());
-                    line = new StringBuilder();
-                    //handle EOF
-                    if (_ch == Constants.EOF) {
-                        this.tokenize((char) _ch, charIndex, lineIndex, handleToken(buffer));
-                        break;
-                    }
-                } else {
-                    ch = (char) _ch;
-                    line.append(ch);
-                }
-                this.tokenize(ch, charIndex++, lineIndex, handleToken(buffer));
-            }
-
-        }).exceptionally(t -> {
+        // Tokenize on the caller thread. Async scan() deadlocks when the caller
+        // blocks in TokenBuffer.get() before ForkJoin common-pool workers exist
+        // (e.g. Spring @PostConstruct / OutlineParser grammar bootstrap on main).
+        try {
+            scanInto(buffer);
+        } catch (Exception t) {
             t.printStackTrace();
             buffer.addToken(null);
-            return null;
-        });
+        }
         return buffer;
+    }
+
+    private void scanInto(TokenBuffer buffer) {
+        StringBuilder line = new StringBuilder();
+        char ch = ' ';
+        int _ch;
+        while (true) {
+            _ch = read(reader);
+            if (eolOrEof(_ch)) {
+                if (eolOrEof(ch) && _ch != Constants.EOF && ch != (char) _ch) continue;
+                ch = (char) _ch;
+                lineIndex = this.codeCache.addLine(line.toString());
+                line = new StringBuilder();
+                //handle EOF
+                if (_ch == Constants.EOF) {
+                    this.tokenize((char) _ch, charIndex, lineIndex, handleToken(buffer));
+                    break;
+                }
+            } else {
+                ch = (char) _ch;
+                line.append(ch);
+            }
+            this.tokenize(ch, charIndex++, lineIndex, handleToken(buffer));
+        }
     }
 
     protected Consumer<Token> handleToken(TokenBuffer buffer) {
