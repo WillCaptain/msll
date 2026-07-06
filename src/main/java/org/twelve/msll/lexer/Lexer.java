@@ -46,8 +46,19 @@ public abstract class Lexer {
         // (e.g. Spring @PostConstruct / OutlineParser grammar bootstrap on main).
         try {
             scanInto(buffer);
+        } catch (LexerException le) {
+            // Malformed input: a character the grammar has no terminal for (e.g. a
+            // stray backslash). This is an expected, positioned parse error — record
+            // its message so the parser surfaces a clean GrammarSyntaxException rather
+            // than NPE-ing on the null sentinel appended below. No stack trace: it is
+            // ordinary bad input, not an internal fault.
+            buffer.setLexerError(le.getMessage());
+            buffer.addToken(null);
         } catch (Exception t) {
+            // Unexpected internal failure — keep the diagnostic trace, but still carry
+            // a message so downstream never dereferences the null sentinel blindly.
             t.printStackTrace();
+            buffer.setLexerError(t.getMessage() == null ? "lexing failed: " + t : t.getMessage());
             buffer.addToken(null);
         }
         return buffer;

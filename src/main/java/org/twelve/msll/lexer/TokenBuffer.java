@@ -10,8 +10,26 @@ public class TokenBuffer {
     private final CodeCache codeCache;
     private int currentIndex = 0;
 
+    /**
+     * Set when tokenization aborts on malformed input (e.g. a stray character
+     * with no matching terminal). Carries the positioned {@code LexerException}
+     * message so the parser can raise a clean {@code GrammarSyntaxException}
+     * instead of dereferencing the {@code null} sentinel token that follows it.
+     */
+    private volatile String lexerError = null;
+
     public TokenBuffer(CodeCache codeCache) {
         this.codeCache = codeCache;
+    }
+
+    /** Records why tokenization aborted; see {@link #lexerError}. */
+    public synchronized void setLexerError(String message) {
+        this.lexerError = message;
+    }
+
+    /** @return the lexer failure message, or {@code null} if tokenization succeeded. */
+    public synchronized String lexerError() {
+        return this.lexerError;
     }
 
     // Method to add tokens to the buffer

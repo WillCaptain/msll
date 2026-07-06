@@ -469,12 +469,24 @@ public abstract class MsllParser<P extends ParserTree> {
         // common-pool hop per parse (latency + contention with concurrent
         // editor requests) for a strictly synchronous result.
         try {
+            // Tokenization aborted on malformed input (e.g. a stray backslash the
+            // grammar has no terminal for). The lexer left a positioned message and
+            // a null sentinel token; surface a clean, well-formed syntax error naming
+            // the offending character rather than dereferencing the sentinel below.
+            String lexerError = tokens.lexerError();
+            if (lexerError != null) {
+                throw new GrammarSyntaxException(lexerError);
+            }
             AtomicInteger lineIndex = new AtomicInteger(-1);
             // Hoisted: the token buffer is complete after scan(), so whether it
             // ends with END never changes mid-loop (the old loop re-read and
             // string-compared the last token's terminal name every iteration).
-            boolean endsWithEnd = tokens.size() > 0
-                    && tokens.get(tokens.size() - 1).terminal().name().equals(Constants.END_STR);
+            // The last token is guarded against null in case tokenization aborted
+            // without recording an error (defensive — lexerError() catches the
+            // known cases above).
+            Token lastToken = tokens.size() > 0 ? tokens.get(tokens.size() - 1) : null;
+            boolean endsWithEnd = lastToken != null
+                    && lastToken.terminal().name().equals(Constants.END_STR);
             int cursor = 0;
             while (cursor == 0 || cursor < tokens.size() || !endsWithEnd) {
                 try {
