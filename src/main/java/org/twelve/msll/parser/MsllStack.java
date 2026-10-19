@@ -59,38 +59,14 @@ public class MsllStack {
      */
     private Flag flag;
 
-    private Map<ParseNode, GrammarAmbiguity> batches = new HashMap<>();
     /**
-     * Flattened ancestor ambiguities. Kept as a flat map (not a chain) because
-     * {@link #pop(Token)} looks one up on every popped node and needs O(1) lookup —
-     * the lookups vastly outnumber the forks.
-     *
-     * <p>The map is <em>immutable</em> once published to a stack: a stack's
-     * {@link #batches} is filled only at construction (via {@link #addBatch}) and
-     * never mutated afterwards, and {@code parentBatches} is only ever reassigned,
-     * never {@code put} into. Historically every fork rebuilt this map by merging
-     * the parent's {@code batches} + {@code parentBatches} — an O(ancestors) copy
-     * that compounded to O(n²) (a single 4 KB parse copied ~8M entries over ~60k
-     * forks; the merge was ~40 % of parse wall-clock). Now a fork {@link #share(MsllStack)}s
-     * the parent's already-flattened map by reference whenever the parent itself
-     * added no ambiguity (the common case), and only allocates a new map at the
-     * comparatively rare forks where {@code parent.batches} is non-empty. {@link #free()}
-     * hands the stack a fresh {@code batches} map rather than clearing the old one,
-     * so references shared into descendants stay valid.
+     * Ambiguity checkpoints visible to this stack, including ancestors.
+     * Published roots are immutable, so a fork shares the parent root and
+     * {@link AmbiguityIndex#with} copies only the path to the new checkpoint.
+     * {@link #free()} drops this stack's reference and does not mutate a root
+     * a descendant still holds.
      */
-    private Map<ParseNode, GrammarAmbiguity> parentBatches = Collections.emptyMap();
-
-    /** Parent's flattened ancestor map extended with the parent's own batches (shared when possible). */
-    private static Map<ParseNode, GrammarAmbiguity> share(MsllStack parent) {
-        if (parent.batches.isEmpty()) {
-            return parent.parentBatches;  // O(1) structural share — parent added nothing
-        }
-        Map<ParseNode, GrammarAmbiguity> merged =
-                new HashMap<>(parent.parentBatches.size() + parent.batches.size(), 1f);
-        merged.putAll(parent.parentBatches);
-        merged.putAll(parent.batches);
-        return merged;
-    }
+    private AmbiguityIndex index = AmbiguityIndex.EMPTY;
 
     /**
      * Number of input tokens this stack has consumed. Used by the longest-match
@@ -117,44 +93,34 @@ public class MsllStack {
      */
     public static MsllStack apply(MsllStack parent, GrammarAmbiguity grammarAmbiguity, String grammarName) {
         MsllStack s = freePool.poll();  // O(1) reuse
-        if (s != null) {
-            s.addBatch(grammarAmbiguity);
-        } else {
-            s = new MsllStack(grammarAmbiguity, grammarName);
+        if (s == null) {
+            s = new MsllStack(grammarName);
         }
         s.occupied = true;
+        AmbiguityIndex base = parent == null ? AmbiguityIndex.EMPTY : parent.index;
+        s.index = grammarAmbiguity == null ? base : base.with(grammarAmbiguity.checkNode(), grammarAmbiguity);
 
         if (parent != null) {
             s.flag = new Flag(parent.flag);
             // Direct element copy (no setFlag): forked nodes keep their original flags,
             // matching the historical Vector.addAll behaviour.
             s.nodes.addAll(parent.nodes);
-            // Share the parent's flattened ancestor map by reference when the parent
-            // added no ambiguity of its own; only copy at genuine ambiguity forks.
-            s.parentBatches = share(parent);
             // Forked stack inherits the parent's consumed-token count so the
             // longest-match resolver compares both stacks fairly.
             s.tokensConsumed = parent.tokensConsumed;
         } else {
             s.flag = new Flag(null);
-            s.parentBatches = Collections.emptyMap();
             s.tokensConsumed = 0;
         }
         return s;
     }
 
-    private void addBatch(GrammarAmbiguity grammarAmbiguity) {
-        if (grammarAmbiguity == null) return;
-        this.batches.put(grammarAmbiguity.checkNode(), grammarAmbiguity);
-    }
-
     /**
      * Private constructor that assigns a unique index to the new stack.
      */
-    private MsllStack(GrammarAmbiguity grammarAmbiguity, String grammarName) {
+    private MsllStack(String grammarName) {
         this.id = counter.incrementAndGet();
         this.grammarName = grammarName;
-        this.addBatch(grammarAmbiguity);
     }
 
 
@@ -181,12 +147,9 @@ public class MsllStack {
         if (!this.occupied) return;  // guard: already freed, do not re-add to pool
         this.occupied = false;
         this.nodes.clear();
-        // Hand the stack a FRESH batches map instead of clearing in place: a descendant
-        // fork may still reference this exact map (share() hands it out by reference),
-        // and clearing it would corrupt that descendant's ancestor lookups. The old map
-        // is now immutable and is GC'd once no live stack references it.
-        this.batches = new HashMap<>();
-        this.parentBatches = Collections.emptyMap();
+        // Drop the reference. The previous root stays intact for any descendant
+        // that captured it before this stack was freed.
+        this.index = AmbiguityIndex.EMPTY;
         this.tokensConsumed = 0;
         freePool.offer(this);
     }
@@ -267,10 +230,7 @@ public class MsllStack {
         ParseNode popped = this.pop();
         GrammarAmbiguity grammarAmbiguity = null;
         if (!this.isEmpty()) {
-            // Hot path: this stack's own batch first, then the shared flattened
-            // ancestor map. Both are O(1); no merged map is materialised on pop.
-            grammarAmbiguity = this.batches.get(popped);
-            if (grammarAmbiguity == null) grammarAmbiguity = this.parentBatches.get(popped);
+            grammarAmbiguity = this.index.get(popped);
         }
         // Only use a non-hidden token as the disambiguation key.
         // Hidden-channel tokens (e.g. SingleLineComment) must never be passed to
